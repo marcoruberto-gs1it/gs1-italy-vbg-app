@@ -160,7 +160,6 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           )}
 
           {barDigits && <Bars digits={barDigits} />}
-          {!primary && scan.kind === 'url' && scan.url && <p className="sub-digits url">{scan.url}</p>}
 
           <div className="chips">
             {scan.checkDigit === true && <span className="chip ok"><ShieldCheck size={14} /> Cifra di controllo valida</span>}
@@ -169,7 +168,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
         </div>
 
         {/* Il link del QR Code va valutato prima di tutto: è quello che l'utente sta per aprire. */}
-        {scan.url && <LinkCard url={scan.url} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
+        {scan.url && <LinkCard url={scan.url} raw={scan.raw.trim()} manual={scan.format === 'Manuale'} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 
@@ -335,8 +334,10 @@ const linkVerdicts: Record<LinkCheck['level'], string> = {
  * Link contenuto nel QR Code: separato dalla verifica del prodotto, perché un codice autentico
  * può essere stampato in un QR Code che punta a un sito di phishing.
  */
-function LinkCard({ url, gs1, vbg, safeUrl }: { url: string; gs1: boolean; vbg: Verification | undefined | null; safeUrl?: string }) {
+function LinkCard({ url, raw, manual, gs1, vbg, safeUrl }: { url: string; raw: string; manual: boolean; gs1: boolean; vbg: Verification | undefined | null; safeUrl?: string }) {
   const [confirm, setConfirm] = useState(false)
+  // Si mostra il testo esattamente come scritto nel codice; si apre la forma normalizzata dal browser.
+  const shown = sameUrl(raw, url) ? raw : url
   const check = assessLink(url, vbg)
   const domain = registrableDomain(check.host)
   // Alternativa sicura: lo stesso codice aperto tramite il resolver GS1 (id.gs1.org).
@@ -345,7 +346,7 @@ function LinkCard({ url, gs1, vbg, safeUrl }: { url: string; gs1: boolean; vbg: 
 
   return (
     <div className={`result-card link-safety is-${check.level}`}>
-      <p className="link-eyebrow"><Link2 size={14} /> {gs1 ? 'Link nel QR Code Standard GS1' : 'Link nel codice'}</p>
+      <p className="link-eyebrow"><Link2 size={14} /> {manual ? 'Link inserito a mano' : gs1 ? 'Link nel QR Code Standard GS1' : 'Link nel codice'}</p>
       <div className="link-head">
         <span className="link-badge"><Icon size={22} className={check.level === 'pending' ? 'spin' : undefined} /></span>
         <div>
@@ -354,6 +355,7 @@ function LinkCard({ url, gs1, vbg, safeUrl }: { url: string; gs1: boolean; vbg: 
           {check.host !== domain && <p className="link-host">{check.host}</p>}
         </div>
       </div>
+      <ReadUrl url={shown} />
       <ul className="link-reasons">
         {check.reasons.map((reason) => <li key={reason}>{reason}</li>)}
       </ul>
@@ -369,12 +371,75 @@ function LinkCard({ url, gs1, vbg, safeUrl }: { url: string; gs1: boolean; vbg: 
         check.level !== 'pending' && <button className="cta cta-navy" type="button" onClick={() => setConfirm(true)}>Apri il link…</button>
       )}
 
-      {confirm && <ConfirmOpen check={check} domain={domain} onClose={() => setConfirm(false)} />}
+      {confirm && <ConfirmOpen check={check} shown={shown} domain={domain} onClose={() => setConfirm(false)} />}
     </div>
   )
 }
 
-function ConfirmOpen({ check, domain, onClose }: { check: LinkCheck; domain: string; onClose: () => void }) {
+function sameUrl(raw: string, href: string) {
+  try {
+    return new URL(raw).href === href
+  } catch {
+    return false
+  }
+}
+
+/**
+ * L'indirizzo esattamente come è scritto nel codice, senza abbreviazioni, con il dominio in evidenza:
+ * è l'informazione che serve all'utente per decidere se aprirlo.
+ */
+function ReadUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  const match = url.match(/^([a-z][a-z0-9+.-]*:\/\/)([^/?#]*)(.*)$/is)
+  let parsedHost: string | undefined
+  try {
+    parsedHost = new URL(url).hostname
+  } catch {
+    parsedHost = undefined
+  }
+
+  let body: React.ReactNode = url
+  if (match) {
+    const [, scheme, authority, rest] = match
+    const at = authority.lastIndexOf('@')
+    const userinfo = at >= 0 ? authority.slice(0, at + 1) : ''
+    const host = at >= 0 ? authority.slice(at + 1) : authority
+    body = (
+      <>
+        <span className={/^https:/i.test(scheme) ? 'url-scheme' : 'url-alert'}>{scheme}</span>
+        {userinfo && <span className="url-alert">{userinfo}</span>}
+        <mark className="url-host">{host}</mark>
+        <span className="url-rest">{rest}</span>
+      </>
+    )
+  }
+  // Caratteri internazionali: il browser apre in realtà il dominio in forma "xn--".
+  const rawHost = match?.[2].split('@').pop()?.split(':')[0].toLowerCase()
+  const differs = parsedHost && rawHost && parsedHost !== rawHost
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* copia non disponibile */
+    }
+  }
+
+  return (
+    <div className="read-url">
+      <div className="read-url-head">
+        <span>Indirizzo letto</span>
+        <button type="button" onClick={() => void copy()} aria-label="Copia l’indirizzo">{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+      </div>
+      <p className="read-url-text">{body}</p>
+      {differs && <p className="read-url-note">Il browser aprirebbe in realtà il dominio <b>{parsedHost}</b></p>}
+    </div>
+  )
+}
+
+function ConfirmOpen({ check, shown, domain, onClose }: { check: LinkCheck; shown: string; domain: string; onClose: () => void }) {
   const scope = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -403,7 +468,7 @@ function ConfirmOpen({ check, domain, onClose }: { check: LinkCheck; domain: str
             <h2>{check.level === 'danger' ? 'Questo link sembra pericoloso' : 'Stai per aprire un sito non verificato'}</h2>
             <p className="confirm-lead">Il link porta a:</p>
             <p className="link-domain big">{domain}</p>
-            <p className="link-host">{check.url}</p>
+            <ReadUrl url={shown} />
             <ul className="link-reasons">
               {check.reasons.map((reason) => <li key={reason}>{reason}</li>)}
             </ul>

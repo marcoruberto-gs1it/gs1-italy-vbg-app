@@ -2169,6 +2169,78 @@
   margin-top: 2px;
 }
 
+.read-url {
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1.5px var(--mist);
+  padding: 10px 12px 12px;
+  text-align: left;
+}
+
+.read-url-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.read-url-head button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--navy);
+  background: var(--surface);
+}
+
+.read-url-text {
+  max-height: 168px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.url-scheme {
+  color: var(--muted);
+}
+
+.url-alert {
+  color: var(--bad);
+  font-weight: 700;
+  background: var(--bad-bg);
+  border-radius: 4px;
+}
+
+.url-host {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--sky);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.url-rest {
+  color: var(--muted);
+}
+
+.read-url-note {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bad);
+  overflow-wrap: anywhere;
+}
+
 .danger-link {
   color: var(--bad);
   font-size: 14px;
