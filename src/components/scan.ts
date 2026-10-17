@@ -1,6 +1,6 @@
 import type { ScanResult } from '../gs1/interpret'
 import { canVerify, type Verification } from '../gs1/vbg'
-import type { StoredSymbol } from './symbol'
+import type { StoredSymbol } from './symbolData'
 
 /** `vbg` assente = verifica non ancora arrivata (o non richiesta, vedi needsVerification). */
 export type Scan = ScanResult & { vbg?: Verification; symbol?: StoredSymbol }
