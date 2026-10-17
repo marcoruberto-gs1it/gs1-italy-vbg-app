@@ -100,7 +100,7 @@ export function InfoContent({ topic, onTryDemo }: { topic: InfoTopic; onTryDemo:
           </ol>
           <div className="privacy">
             <Lock size={20} />
-            <p><strong>Le immagini restano sul telefono.</strong> Al registro GS1 viene inviato solo il numero letto, mai la foto.</p>
+            <p><strong>Le immagini restano sul telefono.</strong> Al registro GS1 viene inviato solo il numero letto, mai la foto. Per le statistiche registriamo l’esito della scansione senza IP né identificativi: trovi i dettagli in “Privacy e dati”.</p>
           </div>
         </>
       )}

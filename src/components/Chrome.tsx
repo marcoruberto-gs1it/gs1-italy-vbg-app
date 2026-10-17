@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ArrowUpRight, History, House, ImageUp, Info, Keyboard, Layers, Menu, ScanBarcode, ShieldCheck, X } from 'lucide-react'
+import { ArrowUpRight, History, House, ImageUp, Info, Keyboard, Layers, Lock, Menu, ScanBarcode, ShieldCheck, X } from 'lucide-react'
 import logo from '../assets/gs1-italy-logo.png'
 import { GS1_IT, legalLinks, serviceLinks, socialLinks } from '../lib/links'
 
@@ -30,6 +30,7 @@ export function Header({ raised, onMenu, onLogo }: { raised: boolean; onMenu: ()
 
 type DrawerActions = {
   onClose: () => void
+  onPrivacy: () => void
   onScan: () => void
   onManual: () => void
   onImage: () => void
@@ -37,7 +38,7 @@ type DrawerActions = {
   onInfo: (topic: InfoTopic) => void
 }
 
-export function Drawer({ onClose, onScan, onManual, onImage, onTab, onInfo }: DrawerActions) {
+export function Drawer({ onClose, onPrivacy, onScan, onManual, onImage, onTab, onInfo }: DrawerActions) {
   const scope = useRef<HTMLDivElement>(null)
 
   useGSAP(
@@ -74,6 +75,7 @@ export function Drawer({ onClose, onScan, onManual, onImage, onTab, onInfo }: Dr
         <button className="drawer-item" type="button" onClick={run(() => onInfo('codes'))}><Layers size={20} /> Cosa puoi leggere</button>
         <button className="drawer-item" type="button" onClick={run(() => onInfo('how'))}><Info size={20} /> Come funziona</button>
         <button className="drawer-item" type="button" onClick={run(() => onInfo('vbg'))}><ShieldCheck size={20} /> Verified by GS1</button>
+        <button className="drawer-item" type="button" onClick={run(onPrivacy)}><Lock size={20} /> Privacy e dati</button>
 
         <p className="drawer-label">GS1 Italy</p>
         <a className="drawer-item ext" href={GS1_IT} target="_blank" rel="noreferrer">gs1it.org <ArrowUpRight size={16} /></a>
@@ -107,7 +109,7 @@ export function TabBar({ tab, onTab, onScan, badge }: { tab: Tab; onTab: (tab: T
   )
 }
 
-export function Footer() {
+export function Footer({ onPrivacy }: { onPrivacy: () => void }) {
   return (
     <footer className="footer">
       <img className="footer-logo" src={logo} alt="GS1 Italy" width={70} height={48} />
@@ -125,6 +127,7 @@ export function Footer() {
         <div>
           <h3>Note legali</h3>
           <ul>
+            <li><button className="footer-privacy" type="button" onClick={onPrivacy}>Privacy e dati dell’app</button></li>
             {legalLinks.map((link) => (
               <li key={link.href}><a href={link.href} target="_blank" rel="noreferrer">{link.label}</a></li>
             ))}

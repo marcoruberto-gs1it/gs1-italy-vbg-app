@@ -8,7 +8,7 @@ export const serviceLinks = [
 ]
 
 export const legalLinks = [
-  { label: 'Privacy policy', href: `${GS1_IT}/privacy-policy/` },
+  { label: 'Privacy policy GS1 Italy', href: `${GS1_IT}/privacy-policy/` },
   { label: 'Cookie', href: `${GS1_IT}/informativa-cookie/` },
   { label: 'Accessibilità', href: `${GS1_IT}/accessibilita/` },
   { label: 'Disclaimer', href: `${GS1_IT}/disclaimer/` },

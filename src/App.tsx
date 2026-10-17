@@ -7,6 +7,7 @@ import './App.css'
 import { Drawer, Header, TabBar, type InfoTopic, type Tab } from './components/Chrome'
 import { HistoryList, ManualForm, Sheet } from './components/Common'
 import { Home } from './components/Home'
+import { PrivacyContent } from './components/Privacy'
 import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
@@ -22,7 +23,7 @@ import { formatName } from './scanner/formats'
 import type { Hit } from './scanner/types'
 import type { CameraError } from './scanner/useScanner'
 
-type SheetState = { type: 'manual' } | { type: 'info'; topic: InfoTopic } | null
+type SheetState = { type: 'manual' } | { type: 'info'; topic: InfoTopic } | { type: 'privacy' } | null
 
 const HISTORY_KEY = 'vbg-history-v2'
 const LOCK_MS = 560
@@ -255,6 +256,7 @@ export default function App() {
             onScan={openScanner}
             onManual={() => setSheet({ type: 'manual' })}
             onInfo={(topic) => setSheet({ type: 'info', topic })}
+            onPrivacy={() => setSheet({ type: 'privacy' })}
           />
         ) : (
           <div className="page" ref={pageRef}>
@@ -297,6 +299,7 @@ export default function App() {
       {drawer && (
         <Drawer
           onClose={() => setDrawer(false)}
+          onPrivacy={() => setSheet({ type: 'privacy' })}
           onScan={openScanner}
           onManual={() => setSheet({ type: 'manual' })}
           onImage={() => fileRef.current?.click()}
@@ -308,6 +311,11 @@ export default function App() {
       {sheet?.type === 'manual' && (
         <Sheet title="Inserisci un codice" onClose={() => setSheet(null)}>
           <ManualForm onSubmit={readManual} />
+        </Sheet>
+      )}
+      {sheet?.type === 'privacy' && (
+        <Sheet title="Privacy e dati" tall onClose={() => setSheet(null)}>
+          <PrivacyContent />
         </Sheet>
       )}
       {sheet?.type === 'info' && (

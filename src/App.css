@@ -991,6 +991,106 @@
   text-decoration: none;
 }
 
+/* ───────── Privacy e dati ───────── */
+
+.legal {
+  display: grid;
+  gap: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.legal section {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.legal h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.legal h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.legal h4 svg {
+  color: var(--orange);
+}
+
+.legal p {
+  margin: 0;
+  font-weight: 500;
+}
+
+.legal em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.legal a {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.legal-list {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  list-style: disc;
+  font-weight: 500;
+}
+
+.privacy-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-summary li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.privacy-summary svg {
+  flex: none;
+  color: var(--orange);
+  margin-top: 1px;
+}
+
+.legal-foot {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.footer-privacy {
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 44, 108, 0.3);
+  text-underline-offset: 3px;
+}
+
 /* ───────── Scanner (schermo intero) ───────── */
 
 .scanner {

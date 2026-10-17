@@ -19,9 +19,10 @@ type Props = {
   onScan: () => void
   onManual: () => void
   onInfo: (topic: InfoTopic) => void
+  onPrivacy: () => void
 }
 
-export function Home({ cameraIssue, onScan, onManual, onInfo }: Props) {
+export function Home({ cameraIssue, onScan, onManual, onInfo, onPrivacy }: Props) {
   const scope = useRef<HTMLDivElement>(null)
   const off = cameraIssue ? offText[cameraIssue] : undefined
   const canRetry = cameraIssue === 'denied' || cameraIssue === 'notfound'
@@ -95,7 +96,7 @@ export function Home({ cameraIssue, onScan, onManual, onInfo }: Props) {
       </section>
 
       <div className="reveal">
-        <Footer />
+        <Footer onPrivacy={onPrivacy} />
       </div>
     </div>
   )
