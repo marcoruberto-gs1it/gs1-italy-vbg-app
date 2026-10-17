@@ -1,0 +1,103 @@
+:root {
+  /* Palette GS1 */
+  --navy: #002c6c;
+  --navy-2: #1d4f9a;
+  --orange: #f26334;
+  --orange-2: #d6512a;
+  --sky: #dce6f5;
+  --peach: #fde4d8;
+
+  --bg: #eef2f8;
+  --surface: #ffffff;
+  --ink: #0f2147;
+  --muted: #5f6f8a;
+  --line: rgba(0, 44, 108, 0.08);
+  --mist: #e8edf5;
+  --ok: #12855a;
+  --ok-bg: #e1f3ea;
+  --warn: #a35a00;
+  --warn-bg: #fdf0dc;
+  --bad: #c8283a;
+  --bad-bg: #fce6e8;
+
+  --shadow-sm: 0 4px 14px -6px rgba(0, 44, 108, 0.14);
+  --shadow: 0 18px 40px -18px rgba(0, 44, 108, 0.28), 0 2px 8px -2px rgba(0, 44, 108, 0.06);
+  --radius: 24px;
+  --gutter: 18px;
+
+  --font-ui: 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease-out: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --ease-snap: cubic-bezier(0.3, 1.35, 0.4, 1);
+
+  color-scheme: light;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  background: #e3e9f3;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  display: block;
+}
+
+:focus-visible {
+  outline: 2.5px solid var(--orange);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+address {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
