@@ -15,5 +15,7 @@
   "ratelimits": [
     { "name": "VBG_LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }
   ],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Statistiche sulle scansioni: la chiave è il secret SUPABASE_SECRET_KEY.
+  "vars": { "SUPABASE_URL": "https://bpgdftmvduzahbczxiik.supabase.co" }
 }

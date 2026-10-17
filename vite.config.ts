@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
   const vbgProxy: Record<string, ProxyOptions> = {
     // Il controllo dei siti malevoli usa la chiave Google custodita dal Worker pubblicato.
     '/api/linkcheck': { target: 'https://gs1-vbg-scan.marco-ruberto.workers.dev', changeOrigin: true },
+    // Le statistiche passano dal Worker pubblicato, che custodisce la chiave Supabase.
+    '/api/events': { target: 'https://gs1-vbg-scan.marco-ruberto.workers.dev', changeOrigin: true },
     '/api/vbg': {
       target: 'https://api.vbg.gs1it.org',
       changeOrigin: true,
@@ -33,6 +35,9 @@ export default defineConfig(({ mode }) => {
   return {
     // Su GitHub Pages l'app vive in /<nome-repo>/: il workflow imposta BASE_PATH.
     base: process.env.BASE_PATH ?? '/',
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? `build-${new Date().toISOString().slice(0, 10)}`),
+    },
     plugins: [react(), basicSsl()],
     // allowedHosts: consente il tunnel HTTPS di `npm run tunnel` (certificato valido → il permesso fotocamera resta salvato).
     server: { host: true, proxy: vbgProxy, allowedHosts: ['.trycloudflare.com'] },

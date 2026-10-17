@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ScanBarcode, Trash2 } from 'lucide-react'
+import { isSettled, sendEvent, type ScanSource } from './analytics/events'
 import './App.css'
 import { Drawer, Header, TabBar, type InfoTopic, type Tab } from './components/Chrome'
 import { HistoryList, ManualForm, Sheet } from './components/Common'
@@ -66,6 +67,9 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [cameraIssue, setCameraIssue] = useState<CameraError | null>(initialIssue)
   const [raised, setRaised] = useState(false)
+  // Statistiche: scansioni nuove in attesa che tutti i controlli asincroni siano arrivati.
+  const pendingEvents = useRef(new Map<string, ScanSource>())
+  const historyRef = useRef(history)
 
   useEffect(() => {
     void loadToolkit()
@@ -77,6 +81,19 @@ export default function App() {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30)))
     } catch {
       /* archiviazione non disponibile */
+    }
+  }, [history])
+
+  // Invia l'evento appena la scansione è completa (sintassi, VbG, siti malevoli).
+  useEffect(() => {
+    historyRef.current = history
+    for (const [id, source] of pendingEvents.current) {
+      const item = history.find((h) => h.id === id)
+      if (!item) pendingEvents.current.delete(id)
+      else if (isSettled(item)) {
+        pendingEvents.current.delete(id)
+        sendEvent(item, source)
+      }
     }
   }, [history])
 
@@ -144,8 +161,18 @@ export default function App() {
   }, [])
 
   const show = useCallback(
-    (scanned: Scan, center?: { x: number; y: number }) => {
+    (scanned: Scan, center?: { x: number; y: number }, source?: ScanSource) => {
       const result = withDisplayFormat(scanned)
+      if (source) {
+        pendingEvents.current.set(result.id, source)
+        // Se un controllo non risponde, l'evento parte comunque con i dati disponibili.
+        window.setTimeout(() => {
+          if (!pendingEvents.current.has(result.id)) return
+          pendingEvents.current.delete(result.id)
+          const item = historyRef.current.find((h) => h.id === result.id)
+          if (item) sendEvent(item, source)
+        }, 12_000)
+      }
       setOrigin(center ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.4 })
       setScan(result)
       setHistory((list) => [result, ...list.filter((item) => item.raw !== result.raw)].slice(0, 30))
@@ -164,7 +191,7 @@ export default function App() {
         .then((interpreted) => {
           const result = { ...interpreted, symbol: packSymbol(hit.symbol) }
           window.setTimeout(() => {
-            show(result, center)
+            show(result, center, 'camera')
             setReading(false)
           }, Math.max(0, LOCK_MS - (performance.now() - started)))
         })
@@ -196,7 +223,7 @@ export default function App() {
   async function readManual(value: string) {
     const result = await interpretScan(value, 'Manuale')
     setSheet(null)
-    show(result)
+    show(result, undefined, 'manual')
   }
 
   async function readFile(file: File | undefined) {
@@ -206,7 +233,7 @@ export default function App() {
       setNotice('Nessun codice trovato nella foto')
       return
     }
-    show({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) })
+    show({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) }, undefined, 'image')
   }
 
   function openFromHistory(item: Scan) {

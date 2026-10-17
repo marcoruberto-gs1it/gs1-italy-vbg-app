@@ -10,6 +10,8 @@ export type VbgLink = { label: string; title: string; href: string }
 
 export type Licensee = {
   name: string
+  /** GS1 Company Prefix (licenza) del titolare. */
+  prefix?: string
   mo?: string
   gln?: string
   website?: string
@@ -35,11 +37,14 @@ export type Verification = {
   licensee?: Licensee
   links: VbgLink[]
   message?: string
+  /** Codice di errore GS1 (es. E039 = numero non assegnato). */
+  code?: string
 }
 
 type Lang = { language: string; value: string }
 type RawLicence = {
   licenseeName: string
+  licenceKey?: string
   licenseeGLN?: string
   licensingMO?: { moName: string }
   contactPoint?: { website?: string }[]
@@ -150,6 +155,7 @@ function mapLicensee(licence?: RawLicence): Licensee | undefined {
   if (!licence) return undefined
   return {
     name: licence.licenseeName,
+    prefix: licence.licenceKey,
     mo: licence.licensingMO?.moName,
     gln: licence.licenseeGLN,
     website: licence.contactPoint?.find((c) => c.website)?.website,
@@ -177,7 +183,7 @@ function mapLinks(linkset?: RawRecord['linkset']): VbgLink[] {
 function mapRecord(record: RawRecord): Verification {
   const issue = record.validationErrors?.[0]?.errors?.[0]
   if (record.code === 5 || issue) {
-    return { state: 'invalid', links: [], message: (issue && errorMessages[issue.errorCode]) ?? issue?.message ?? 'Il codice non è valido.' }
+    return { state: 'invalid', links: [], code: issue?.errorCode, message: (issue && errorMessages[issue.errorCode]) ?? issue?.message ?? 'Il codice non è valido.' }
   }
 
   const licensee = mapLicensee(record.gs1Licence)

@@ -8,6 +8,9 @@ type Env = {
   VBG_API_TOKEN: string
   /** Chiave Google Web Risk (facoltativa): senza, il controllo dei siti malevoli risulta "non attivo". */
   WEB_RISK_API_KEY?: string
+  /** Statistiche: progetto Supabase e chiave segreta (facoltativi: senza, gli eventi vengono ignorati). */
+  SUPABASE_URL?: string
+  SUPABASE_SECRET_KEY?: string
   ASSETS: Fetcher
   VBG_LIMITER: RateLimit
 }
@@ -81,10 +84,82 @@ async function linkCheck(request: Request, env: Env, ctx: ExecutionContext): Pro
   return reply(result)
 }
 
+/*
+ * POST /api/events: una scansione completata, per le statistiche.
+ * Si accettano solo i campi previsti; la posizione (paese e regione) la aggiunge il Worker da
+ * Cloudflare. L'indirizzo IP non viene salvato.
+ */
+type FieldRule = 'bool' | 'int' | 'strings' | number // number = lunghezza massima della stringa
+const EVENT_FIELDS: Record<string, FieldRule> = {
+  source: 10, device: 10, app_version: 40,
+  symbology: 40, is_2d: 'bool', content_kind: 10, compliance: 10,
+  check_digit_ok: 'bool', syntax_ok: 'bool', syntax_error: 300,
+  primary_ai: 4, primary_key: 90, ai_list: 'strings', issuer_mo: 120,
+  vbg_state: 10, vbg_complete: 'bool', vbg_core_count: 'int', vbg_error_code: 10,
+  company_prefix: 20, licensee_name: 200, licensee_gln: 13, licensing_mo: 80,
+  gpc_brick: 10, gpc_brick_name: 200, gpc_segment: 200,
+  link_domain: 253, link_level: 10, link_imitates: 253, link_threats: 'strings',
+}
+
+function cleanEvent(input: Record<string, unknown>) {
+  const row: Record<string, unknown> = {}
+  for (const [key, rule] of Object.entries(EVENT_FIELDS)) {
+    const value = input[key]
+    if (value === undefined || value === null) continue
+    if (rule === 'bool' && typeof value === 'boolean') row[key] = value
+    else if (rule === 'int' && Number.isInteger(value)) row[key] = value
+    else if (rule === 'strings' && Array.isArray(value)) row[key] = value.filter((v) => typeof v === 'string').slice(0, 30).map((v) => v.slice(0, 40))
+    else if (typeof rule === 'number' && typeof value === 'string') row[key] = value.slice(0, rule)
+  }
+  return row
+}
+
+async function events(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const cors = corsHeaders(request)
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+  if (request.method !== 'POST') return json(request, 405, 'Method not allowed')
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'anonimo'
+  const { success } = await env.VBG_LIMITER.limit({ key: ip })
+  if (!success) return json(request, 429, 'Troppe richieste, riprova tra poco')
+
+  const text = await request.text()
+  if (text.length > 8000) return json(request, 400, 'Richiesta non valida')
+  let row: Record<string, unknown>
+  try {
+    row = cleanEvent(JSON.parse(text) as Record<string, unknown>)
+  } catch {
+    return json(request, 400, 'Richiesta non valida')
+  }
+  if (!row.source) return json(request, 400, 'Richiesta non valida')
+
+  // Posizione a livello di regione, dedotta da Cloudflare (nessun permesso chiesto all'utente).
+  const cf = request.cf as IncomingRequestCfProperties | undefined
+  row.country = cf?.country ?? null
+  row.region_code = cf?.regionCode ?? null
+  row.region = cf?.region ?? null
+  row.is_eu = cf?.isEUCountry === '1'
+
+  if (env.SUPABASE_URL && env.SUPABASE_SECRET_KEY) {
+    // Si risponde subito; la scrittura prosegue in background.
+    ctx.waitUntil(
+      fetch(`${env.SUPABASE_URL}/rest/v1/scan_events`, {
+        method: 'POST',
+        headers: { apikey: env.SUPABASE_SECRET_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(row),
+      }).then(async (res) => {
+        if (!res.ok) console.error('Supabase', res.status, await res.text())
+      }),
+    )
+  }
+  return new Response(null, { status: 202, headers: cors })
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
     if (url.pathname === '/api/linkcheck') return linkCheck(request, env, ctx)
+    if (url.pathname === '/api/events') return events(request, env, ctx)
     const match = url.pathname.match(/^\/api\/vbg\/([a-z]+)\/$/)
     if (!match) return url.pathname.startsWith('/api/') ? json(request, 404, 'Not found') : env.ASSETS.fetch(request)
 

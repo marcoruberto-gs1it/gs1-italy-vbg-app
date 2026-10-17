@@ -90,6 +90,16 @@ Terminologia: un codice QR con dati GS1 è sempre chiamato "QR Code Standard GS1
 
 Nessun link si apre automaticamente dopo una scansione.
 
+## Statistiche sulle scansioni (Supabase)
+
+Ogni scansione completata (fotocamera, foto o inserimento manuale) invia un evento al Worker (`POST /api/events`), che aggiunge paese e regione dedotti da Cloudflare e lo salva nella tabella `scan_events` del progetto Supabase `bpgdftmvduzahbczxiik` (regione UE, Francoforte).
+
+- **Nessun dato personale**: niente IP né identificativi di dispositivo; dei link si salva solo il dominio.
+- **Accesso**: scrive solo il Worker con la chiave segreta (`SUPABASE_SECRET_KEY`); il pubblico non può leggere né scrivere (RLS attiva, nessuna policy).
+- **Schema**: `supabase/schema.sql`, da eseguire nel SQL Editor. `supabase/retention.sql` cancella gli eventi più vecchi di 24 mesi.
+- **Viste**: `barometro_2d`, `benchmark_categoria`, `qualita_errori`, `allerte_brand`, `prefissi_non_assegnati`. Quelle destinate a uscire mostrano solo gruppi con almeno 10 letture.
+- **Codice**: `src/analytics/events.ts` (lato app) e `events()` in `worker/index.ts`.
+
 ## Token API Verified by GS1
 
 L'API non abilita il CORS, quindi il browser non può chiamarla direttamente. Il browser chiama `/api/vbg/...` e il proxy di Vite (`vite.config.ts`) inoltra a `https://api.vbg.gs1it.org/v2/...` aggiungendo `Authorization: Token …` lato server.
