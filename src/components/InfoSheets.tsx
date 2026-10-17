@@ -10,7 +10,7 @@ const formats = [
   { kind: 'gs1128', name: 'GS1-128', text: 'Etichette logistiche con lotto e scadenze' },
   { kind: 'databar', name: 'GS1 DataBar', text: 'Freschi e prodotti a peso variabile' },
   { kind: 'datamatrix', name: 'GS1 DataMatrix', text: 'Farmaci e dispositivi medici' },
-  { kind: 'qr', name: 'QR Code GS1 Digital Link', text: 'Il QR Code che porta alle informazioni del prodotto' },
+  { kind: 'qr', name: 'QR Code Standard GS1', text: 'Con GS1 Digital Link porta alle informazioni del prodotto' },
   { kind: 'keyboard', name: 'A mano', text: 'Digita il numero se il barcode è rovinato' },
 ] as const
 
@@ -66,7 +66,7 @@ export function InfoContent({ topic, onTryDemo }: { topic: InfoTopic; onTryDemo:
     <div className="infographic" ref={scope}>
       {topic === 'codes' && (
         <>
-          <p className="ig-lead">L’app riconosce i barcode e i codici 2D dello standard GS1, e anche i QR Code con un link qualsiasi.</p>
+          <p className="ig-lead">L’app riconosce i barcode e i codici 2D dello standard GS1, come il QR Code Standard GS1. Legge anche altri codici che contengono un semplice link, controllandone il dominio.</p>
           <div className="format-grid">
             {formats.map((f) => (
               <div className="format-tile" key={f.name}>

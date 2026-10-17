@@ -117,7 +117,7 @@ export function assessLink(url: string, vbg: Verification | undefined | null): L
 
   const why =
     vbg === null
-      ? 'Il QR Code non contiene un codice GS1: non c’è un titolare a cui confrontare il dominio.'
+      ? 'Il codice letto non contiene dati GS1: non c’è un titolare a cui confrontare il dominio.'
       : vbg.state === 'error'
         ? 'Il registro Verified by GS1 non è raggiungibile: il dominio non è stato confrontato.'
         : vbg.state === 'invalid'

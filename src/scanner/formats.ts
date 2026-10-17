@@ -29,8 +29,8 @@ const gs1Variants: Record<string, string> = {
   ']C1': 'GS1-128',
   ']d2': 'GS1 DataMatrix',
   ']d5': 'GS1 DataMatrix',
-  ']Q3': 'GS1 QR Code',
-  ']Q5': 'GS1 QR Code',
+  ']Q3': 'QR Code Standard GS1',
+  ']Q5': 'QR Code Standard GS1',
   ']z1': 'GS1 Aztec',
 }
 

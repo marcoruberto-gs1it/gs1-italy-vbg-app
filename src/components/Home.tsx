@@ -64,7 +64,7 @@ export function Home({ cameraIssue, onScan, onManual, onInfo }: Props) {
             <br />
             <em>{off ? 'non attiva' : 'pronto'}</em>
           </h1>
-          <p>{off ?? 'Inquadra un barcode o un QR Code GS1 e leggi subito i dati del prodotto.'}</p>
+          <p>{off ?? 'Inquadra un barcode o un QR Code Standard GS1 e leggi subito i dati del prodotto.'}</p>
         </div>
         <HeroBadge state={off ? 'off' : 'ready'} />
         {off && !canRetry ? (

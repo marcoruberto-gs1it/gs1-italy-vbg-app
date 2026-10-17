@@ -10,7 +10,7 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { needsVerification, type Scan } from './components/scan'
+import { needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { verifyKey } from './gs1/vbg'
 import { decodeImage } from './scanner/decodeImage'
@@ -122,7 +122,8 @@ export default function App() {
   }, [])
 
   const show = useCallback(
-    (result: Scan, center?: { x: number; y: number }) => {
+    (scanned: Scan, center?: { x: number; y: number }) => {
+      const result = withDisplayFormat(scanned)
       setOrigin(center ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.4 })
       setScan(result)
       setHistory((list) => [result, ...list.filter((item) => item.raw !== result.raw)].slice(0, 30))

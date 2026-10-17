@@ -16,7 +16,7 @@ export function titleOf(scan: Scan) {
 }
 
 export function formatKind(format: string) {
-  if (/QR/i.test(format)) return 'qr' as const
+  if (/QR|Codice con/i.test(format)) return 'qr' as const
   if (/Matrix|Aztec|PDF417|MaxiCode/i.test(format)) return 'datamatrix' as const
   if (/DataBar/i.test(format)) return 'databar' as const
   if (/128|39|93|ITF|Codabar/i.test(format)) return 'gs1128' as const
@@ -68,4 +68,14 @@ export function codeType(scan: Scan): CodeType {
     manual,
     count,
   }
+}
+
+/**
+ * Nome da mostrare per i codici QR: "QR Code Standard GS1" solo se contengono dati GS1.
+ * Un QR Code qualsiasi non viene chiamato così, per non attribuirgli una conformità che non ha.
+ */
+export function withDisplayFormat<T extends Scan>(scan: T): T {
+  if (!/QR/i.test(scan.format) || scan.format === 'QR Code Standard GS1') return scan
+  if (scan.kind === 'gs1') return { ...scan, format: 'QR Code Standard GS1' }
+  return { ...scan, format: scan.kind === 'url' ? 'Codice con link' : 'Codice con testo' }
 }

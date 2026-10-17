@@ -43,12 +43,14 @@ Per l'esperienza a schermo intero completa, su telefono usa "Aggiungi a schermat
 
 ## Protezione da quishing e phishing
 
-Un GS1 Digital Link può stare su qualsiasi dominio, quindi un QR Code con un GTIN autentico può comunque puntare a un sito truffa. `src/gs1/linkSafety.ts` valuta ogni link letto e la card "Link nel QR Code" (subito sotto il codice) lo mostra separato dalla verifica del prodotto:
+Un GS1 Digital Link può stare su qualsiasi dominio, quindi un QR Code Standard GS1 con un GTIN autentico può comunque puntare a un sito truffa. `src/gs1/linkSafety.ts` valuta ogni link letto e la card "Link nel QR Code Standard GS1" (subito sotto il codice) lo mostra separato dalla verifica del prodotto:
 
 - **Link verificato**: il dominio è `id.gs1.org` oppure è tra i link o il sito web registrati dal titolare del codice su Verified by GS1. Il link si apre direttamente.
 - **Dominio non riconosciuto**: il pulsante principale apre lo stesso codice tramite il resolver GS1 (`id.gs1.org`); il link originale si apre solo dopo una conferma che mostra il dominio.
 - **Link sospetto**: dominio che imita uno registrato (es. `bariila.com` invece di `barilla.com`), caratteri internazionali (`xn--`), una "@" che nasconde il dominio, oppure un indirizzo IP.
-- Vengono segnalati anche i collegamenti in `http` e i link accorciati. I QR Code con un link qualsiasi passano sempre dalla conferma.
+- Vengono segnalati anche i collegamenti in `http` e i link accorciati. I codici che contengono un link qualsiasi, senza dati GS1, passano sempre dalla conferma.
+
+Terminologia: un codice QR con dati GS1 è sempre chiamato "QR Code Standard GS1". Un codice QR senza dati GS1 non viene chiamato così ("Codice con link" / "Codice con testo"), per non attribuirgli una conformità che non ha.
 
 Nessun link si apre automaticamente dopo una scansione.
 

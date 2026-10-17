@@ -169,7 +169,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
         </div>
 
         {/* Il link del QR Code va valutato prima di tutto: è quello che l'utente sta per aprire. */}
-        {scan.url && <LinkCard url={scan.url} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
+        {scan.url && <LinkCard url={scan.url} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 
@@ -335,7 +335,7 @@ const linkVerdicts: Record<LinkCheck['level'], string> = {
  * Link contenuto nel QR Code: separato dalla verifica del prodotto, perché un codice autentico
  * può essere stampato in un QR Code che punta a un sito di phishing.
  */
-function LinkCard({ url, vbg, safeUrl }: { url: string; vbg: Verification | undefined | null; safeUrl?: string }) {
+function LinkCard({ url, gs1, vbg, safeUrl }: { url: string; gs1: boolean; vbg: Verification | undefined | null; safeUrl?: string }) {
   const [confirm, setConfirm] = useState(false)
   const check = assessLink(url, vbg)
   const domain = registrableDomain(check.host)
@@ -345,7 +345,7 @@ function LinkCard({ url, vbg, safeUrl }: { url: string; vbg: Verification | unde
 
   return (
     <div className={`result-card link-safety is-${check.level}`}>
-      <p className="link-eyebrow"><Link2 size={14} /> Link nel QR Code</p>
+      <p className="link-eyebrow"><Link2 size={14} /> {gs1 ? 'Link nel QR Code Standard GS1' : 'Link nel codice'}</p>
       <div className="link-head">
         <span className="link-badge"><Icon size={22} className={check.level === 'pending' ? 'spin' : undefined} /></span>
         <div>
