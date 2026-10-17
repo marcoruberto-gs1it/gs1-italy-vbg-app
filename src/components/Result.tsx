@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ArrowUpRight, Check, Copy, ImageOff, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldCheck, TriangleAlert, X } from 'lucide-react'
+import { ArrowUpRight, Check, Copy, ImageOff, Link2, LoaderCircle, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldAlert, ShieldCheck, TriangleAlert, X } from 'lucide-react'
+import { assessLink, registrableDomain, type LinkCheck } from '../gs1/linkSafety'
 import { canVerify, type Verification } from '../gs1/vbg'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
@@ -39,7 +40,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
   const groups = digits ? groupDigits(primary?.ai === '01' ? barDigits : digits) : null
   const issuer = vbg?.licensee?.mo ?? scan.issuer
   const type = codeType(scan)
-  const openUrl = scan.url ?? scan.digitalLink
+  // Si condivide il link canonico GS1 quando c'è, mai un dominio non verificato al posto suo.
+  const shareUrl = scan.digitalLink ?? scan.url
   const canShare = typeof navigator.share === 'function'
 
   useEffect(() => {
@@ -119,7 +121,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             {copied ? <Check size={18} /> : <Copy size={18} />}
           </button>
           {canShare && (
-            <button className="icon-btn" type="button" onClick={() => void navigator.share({ title: titleOf(scan), text: primary?.value ?? scan.raw, url: openUrl }).catch(() => {})} aria-label="Condividi">
+            <button className="icon-btn" type="button" onClick={() => void navigator.share({ title: titleOf(scan), text: primary?.value ?? scan.raw, url: shareUrl }).catch(() => {})} aria-label="Condividi">
               <Share2 size={18} />
             </button>
           )}
@@ -165,6 +167,9 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             {scan.checkDigit === false && <span className="chip bad"><TriangleAlert size={14} /> Cifra di controllo errata</span>}
           </div>
         </div>
+
+        {/* Il link del QR Code va valutato prima di tutto: è quello che l'utente sta per aprire. */}
+        {scan.url && <LinkCard url={scan.url} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 
@@ -216,11 +221,11 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           </div>
         )}
 
-        {openUrl && (
-          <a className="result-card link-card" href={openUrl} target="_blank" rel="noreferrer">
+        {!scan.url && scan.digitalLink && (
+          <a className="result-card link-card" href={scan.digitalLink} target="_blank" rel="noreferrer">
             <span>
-              <strong>{scan.kind === 'gs1' && !scan.url ? 'GS1 Digital Link' : 'Apri il link'}</strong>
-              <small>{openUrl.replace(/^https?:\/\//, '')}</small>
+              <strong>GS1 Digital Link</strong>
+              <small>{scan.digitalLink.replace(/^https?:\/\//, '')}</small>
             </span>
             <ArrowUpRight size={20} />
           </a>
@@ -270,7 +275,7 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
     )
   }
 
-  const [lead, word] = verdicts[vbg.state]
+  const [lead, word] = vbg.state === 'verified' && isProduct ? ['Prodotto', 'verificato'] : verdicts[vbg.state]
   const sub =
     vbg.state === 'verified'
       ? 'Dati pubblicati dal titolare su Verified by GS1.'
@@ -316,6 +321,100 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
         </button>
       )}
     </div>
+  )
+}
+
+const linkVerdicts: Record<LinkCheck['level'], string> = {
+  trusted: 'Link verificato',
+  unknown: 'Dominio non riconosciuto',
+  danger: 'Link sospetto',
+  pending: 'Controllo del link…',
+}
+
+/**
+ * Link contenuto nel QR Code: separato dalla verifica del prodotto, perché un codice autentico
+ * può essere stampato in un QR Code che punta a un sito di phishing.
+ */
+function LinkCard({ url, vbg, safeUrl }: { url: string; vbg: Verification | undefined | null; safeUrl?: string }) {
+  const [confirm, setConfirm] = useState(false)
+  const check = assessLink(url, vbg)
+  const domain = registrableDomain(check.host)
+  // Alternativa sicura: lo stesso codice aperto tramite il resolver GS1 (id.gs1.org).
+  const alternative = safeUrl && safeUrl !== url ? safeUrl : undefined
+  const Icon = check.level === 'trusted' ? ShieldCheck : check.level === 'pending' ? LoaderCircle : check.level === 'danger' ? ShieldAlert : TriangleAlert
+
+  return (
+    <div className={`result-card link-safety is-${check.level}`}>
+      <p className="link-eyebrow"><Link2 size={14} /> Link nel QR Code</p>
+      <div className="link-head">
+        <span className="link-badge"><Icon size={22} className={check.level === 'pending' ? 'spin' : undefined} /></span>
+        <div>
+          <h3>{linkVerdicts[check.level]}</h3>
+          <p className="link-domain">{domain}</p>
+          {check.host !== domain && <p className="link-host">{check.host}</p>}
+        </div>
+      </div>
+      <ul className="link-reasons">
+        {check.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+      </ul>
+
+      {check.level === 'trusted' ? (
+        <a className="cta cta-navy" href={url} target="_blank" rel="noreferrer">Apri il link <ArrowUpRight size={18} /></a>
+      ) : alternative ? (
+        <>
+          <a className="cta cta-navy" href={alternative} target="_blank" rel="noreferrer">Apri tramite GS1 (id.gs1.org) <ArrowUpRight size={18} /></a>
+          {check.level !== 'pending' && <button className="text-link danger-link" type="button" onClick={() => setConfirm(true)}>Apri comunque il link originale</button>}
+        </>
+      ) : (
+        check.level !== 'pending' && <button className="cta cta-navy" type="button" onClick={() => setConfirm(true)}>Apri il link…</button>
+      )}
+
+      {confirm && <ConfirmOpen check={check} domain={domain} onClose={() => setConfirm(false)} />}
+    </div>
+  )
+}
+
+function ConfirmOpen({ check, domain, onClose }: { check: LinkCheck; domain: string; onClose: () => void }) {
+  const scope = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopImmediatePropagation()
+      onClose()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [onClose])
+  useGSAP(
+    () => {
+      gsap.from('.sheet-layer', { opacity: 0, duration: 0.2 })
+      gsap.from('.sheet', { yPercent: 100, duration: 0.45, ease: 'power4.out' })
+    },
+    { scope },
+  )
+
+  return createPortal(
+    <div ref={scope}>
+      <div className="sheet-layer" onClick={onClose}>
+        <div className={`sheet confirm-sheet is-${check.level}`} role="alertdialog" aria-modal="true" aria-label="Conferma apertura link" onClick={(e) => e.stopPropagation()}>
+          <span className="grabber" aria-hidden="true" />
+          <div className="sheet-body">
+            <span className="link-badge big">{check.level === 'danger' ? <ShieldAlert size={28} /> : <TriangleAlert size={28} />}</span>
+            <h2>{check.level === 'danger' ? 'Questo link sembra pericoloso' : 'Stai per aprire un sito non verificato'}</h2>
+            <p className="confirm-lead">Il link porta a:</p>
+            <p className="link-domain big">{domain}</p>
+            <p className="link-host">{check.url}</p>
+            <ul className="link-reasons">
+              {check.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+            <p className="confirm-tip">Non inserire password, dati personali o di pagamento se non sei sicuro del sito.</p>
+            <button className="cta cta-navy" type="button" onClick={onClose}>Non aprire</button>
+            <a className="text-link danger-link" href={check.url} target="_blank" rel="noreferrer noopener" onClick={onClose}>Apri {domain} <ArrowUpRight size={16} /></a>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 

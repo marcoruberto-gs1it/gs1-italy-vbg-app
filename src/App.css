@@ -2056,6 +2056,170 @@
   right: 16px;
 }
 
+/* Link nel QR Code: affidabilità del dominio */
+
+.link-safety {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  box-shadow: var(--shadow);
+}
+
+.link-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.link-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.link-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.link-badge {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 15px;
+  background: var(--mist);
+  color: var(--muted);
+}
+
+.link-badge.big {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  margin: 4px auto 0;
+}
+
+.is-trusted .link-badge { background: var(--ok-bg); color: var(--ok); }
+.is-unknown .link-badge { background: var(--warn-bg); color: var(--warn); }
+.is-danger .link-badge { background: var(--bad-bg); color: var(--bad); }
+.is-pending .link-badge { background: var(--sky); color: var(--navy); }
+.is-trusted .link-head h3 { color: var(--ok); }
+.is-unknown .link-head h3 { color: var(--warn); }
+.is-danger .link-head h3 { color: var(--bad); }
+
+.link-domain {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.link-domain.big {
+  font-size: 22px;
+  text-align: center;
+}
+
+.link-host {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.link-reasons {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.link-reasons li {
+  position: relative;
+  padding-left: 14px;
+}
+
+.link-reasons li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.link-safety .cta {
+  margin-top: 2px;
+}
+
+.danger-link {
+  color: var(--bad);
+  font-size: 14px;
+  padding: 8px;
+}
+
+.confirm-sheet .sheet-body {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  padding-top: 6px;
+}
+
+.confirm-sheet h2 {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+}
+
+.confirm-sheet.is-danger h2 {
+  color: var(--bad);
+}
+
+.confirm-lead,
+.confirm-tip {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.confirm-tip {
+  margin: 4px 0;
+}
+
+.confirm-sheet .link-reasons {
+  text-align: left;
+}
+
+.confirm-sheet .cta {
+  margin-top: 4px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ───────── Toast ───────── */
 
 .toast {

@@ -41,6 +41,17 @@ Per l'esperienza a schermo intero completa, su telefono usa "Aggiungi a schermat
 - **Categorie GPC**: `src/vendor/gs1/gpc-bricks-it.json` contiene i nomi italiani dei brick GPC (pubblicazione GS1 di maggio 2026, traduzione di GS1 Italy), caricati solo alla prima verifica.
 - **Verified by GS1**: `src/gs1/vbg.ts` interroga l'API di GS1 Italy (`https://api.vbg.gs1it.org/v2`, endpoint `gtin`, `gln`, `sscc`, `grai`, …) e mostra se il codice è verificato, solo registrato o non valido, con prodotto, titolare e link del produttore.
 
+## Protezione da quishing e phishing
+
+Un GS1 Digital Link può stare su qualsiasi dominio, quindi un QR Code con un GTIN autentico può comunque puntare a un sito truffa. `src/gs1/linkSafety.ts` valuta ogni link letto e la card "Link nel QR Code" (subito sotto il codice) lo mostra separato dalla verifica del prodotto:
+
+- **Link verificato**: il dominio è `id.gs1.org` oppure è tra i link o il sito web registrati dal titolare del codice su Verified by GS1. Il link si apre direttamente.
+- **Dominio non riconosciuto**: il pulsante principale apre lo stesso codice tramite il resolver GS1 (`id.gs1.org`); il link originale si apre solo dopo una conferma che mostra il dominio.
+- **Link sospetto**: dominio che imita uno registrato (es. `bariila.com` invece di `barilla.com`), caratteri internazionali (`xn--`), una "@" che nasconde il dominio, oppure un indirizzo IP.
+- Vengono segnalati anche i collegamenti in `http` e i link accorciati. I QR Code con un link qualsiasi passano sempre dalla conferma.
+
+Nessun link si apre automaticamente dopo una scansione.
+
 ## Token API Verified by GS1
 
 L'API non abilita il CORS, quindi il browser non può chiamarla direttamente. Il browser chiama `/api/vbg/...` e il proxy di Vite (`vite.config.ts`) inoltra a `https://api.vbg.gs1it.org/v2/...` aggiungendo `Authorization: Token …` lato server.
