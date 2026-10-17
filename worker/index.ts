@@ -6,6 +6,8 @@
 
 type Env = {
   VBG_API_TOKEN: string
+  /** Chiave Google Web Risk (facoltativa): senza, il controllo dei siti malevoli risulta "non attivo". */
+  WEB_RISK_API_KEY?: string
   ASSETS: Fetcher
   VBG_LIMITER: RateLimit
 }
@@ -34,9 +36,55 @@ function corsHeaders(request: Request): Record<string, string> {
 const json = (request: Request, status: number, message: string) =>
   new Response(JSON.stringify({ detail: message }), { status, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } })
 
+const THREAT_TYPES = ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE']
+
+/**
+ * POST /api/linkcheck {"url": "..."} → {"checked": bool, "threats": [...]}
+ * Interroga Google Web Risk (uris.search) e tiene in cache l'esito per un'ora.
+ */
+async function linkCheck(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const cors = corsHeaders(request)
+  const reply = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors } })
+
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+  if (request.method !== 'POST') return json(request, 405, 'Method not allowed')
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'anonimo'
+  const { success } = await env.VBG_LIMITER.limit({ key: ip })
+  if (!success) return json(request, 429, 'Troppe richieste, riprova tra poco')
+
+  let target: string
+  try {
+    const body = (await request.json()) as { url?: unknown }
+    target = typeof body.url === 'string' ? body.url : ''
+    const parsed = new URL(target)
+    if (!/^https?:$/.test(parsed.protocol) || target.length > 2048) throw new Error()
+  } catch {
+    return json(request, 400, 'Richiesta non valida')
+  }
+
+  if (!env.WEB_RISK_API_KEY) return reply({ checked: false, threats: [] })
+
+  const cacheKey = new Request(`https://cache.internal/linkcheck?u=${encodeURIComponent(target)}`)
+  const cached = await caches.default.match(cacheKey)
+  if (cached) return reply(await cached.json())
+
+  const query = new URLSearchParams({ uri: target, key: env.WEB_RISK_API_KEY })
+  THREAT_TYPES.forEach((t) => query.append('threatTypes', t))
+  const upstream = await fetch(`https://webrisk.googleapis.com/v1/uris:search?${query}`)
+  if (!upstream.ok) return reply({ checked: false, threats: [], error: upstream.status })
+
+  const data = (await upstream.json()) as { threat?: { threatTypes?: string[] } }
+  const result = { checked: true, threats: data.threat?.threatTypes ?? [] }
+  ctx.waitUntil(caches.default.put(cacheKey, new Response(JSON.stringify(result), { headers: { 'Cache-Control': 'max-age=3600' } })))
+  return reply(result)
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
+    if (url.pathname === '/api/linkcheck') return linkCheck(request, env, ctx)
     const match = url.pathname.match(/^\/api\/vbg\/([a-z]+)\/$/)
     if (!match) return url.pathname.startsWith('/api/') ? json(request, 404, 'Not found') : env.ASSETS.fetch(request)
 

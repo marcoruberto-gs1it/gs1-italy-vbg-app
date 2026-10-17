@@ -53,6 +53,30 @@ In cima all'esito una fascia dice se il codice fa parte degli standard GS1 (`gs1
 
 Il simbolo mostrato è quello realmente scansionato: i codici 2D sono ridisegnati modulo per modulo dalla matrice restituita dal lettore (`src/components/symbol.tsx`, salvata anche in cronologia). Le barre vengono disegnate solo per EAN-13, EAN-8 e UPC-A, la cui codifica è univoca. Per gli altri barcode 1D non si disegna nulla, piuttosto che un simbolo diverso da quello letto.
 
+## Controllo della sintassi GS1
+
+`src/gs1/syntax.ts` usa la libreria ufficiale **GS1 Barcode Syntax Engine** (release 1.4.1, build WebAssembly in `src/vendor/gs1/syntax-engine`) per applicare tutte le regole del GS1 Barcode Syntax Dictionary:
+
+- formato e contenuto di ogni AI (date, cifre di controllo, caratteri ammessi);
+- combinazioni di AI vietate (es. 01 con 37) e AI obbligatori (es. 21 richiede 01);
+- la sintassi del GS1 Digital Link letto.
+
+Gli errori compaiono nella fascia di conformità, tradotti in italiano, con il dato errato evidenziato.
+
+## Rapporto di verifica (PDF)
+
+Dalla scheda dell'esito si genera un PDF sul dispositivo (`src/report/pdf.ts`, jsPDF). Contiene il simbolo letto, la conformità GS1, i dati codificati, la verifica Verified by GS1 con i 7 dati essenziali, l'esito dei controlli sul link e l'elenco dei controlli eseguiti. Sul telefono si condivide, sul computer si scarica.
+
+## Elenchi di siti malevoli (Google Web Risk)
+
+Il Worker espone `POST /api/linkcheck`, che interroga Google Web Risk (`uris.search`) e tiene l'esito in cache per un'ora. Il controllo si attiva quando è presente il secret `WEB_RISK_API_KEY`:
+
+1. Progetto Google Cloud con fatturazione attiva (Web Risk Lookup API: gratuita fino a 100.000 richieste al mese).
+2. Attiva la **Web Risk API** e crea una chiave API limitata a quella API.
+3. `npx wrangler secret put WEB_RISK_API_KEY`
+
+Senza chiave l'app funziona, e nel rapporto il controllo risulta "Non attivo".
+
 ## Protezione da quishing e phishing
 
 Un GS1 Digital Link può stare su qualsiasi dominio, quindi un QR Code Standard GS1 con un GTIN autentico può comunque puntare a un sito truffa. `src/gs1/linkSafety.ts` valuta ogni link letto e la card "Link nel QR Code Standard GS1" (subito sotto il codice) lo mostra separato dalla verifica del prodotto:

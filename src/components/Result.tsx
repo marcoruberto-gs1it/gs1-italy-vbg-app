@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ArrowUpRight, BadgeCheck, Check, CircleSlash, Copy, ImageOff, Keyboard, Link2, LoaderCircle, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldAlert, ShieldCheck, TriangleAlert, X } from 'lucide-react'
+import { ArrowUpRight, BadgeCheck, FileText, Check, CircleSlash, Copy, ImageOff, Keyboard, Link2, LoaderCircle, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldAlert, ShieldCheck, TriangleAlert, X } from 'lucide-react'
 import { assessLink, registrableDomain, type LinkCheck } from '../gs1/linkSafety'
 import { canVerify, type Verification } from '../gs1/vbg'
+import type { WebRiskResult } from '../gs1/webRisk'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
@@ -101,6 +102,39 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
     { scope, dependencies: [vbgState], revertOnUpdate: true },
   )
 
+  const [reporting, setReporting] = useState(false)
+
+  // Rapporto PDF generato sul dispositivo: si condivide dove possibile, altrimenti si scarica.
+  async function report() {
+    if (reporting) return
+    setReporting(true)
+    try {
+      const { buildReport } = await import('../report/pdf')
+      const { blob, filename } = await buildReport(scan)
+      const file = new File([blob], filename, { type: 'application/pdf' })
+      const download = () => {
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = filename
+        link.click()
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
+      }
+      // Sul telefono il pannello di condivisione (che permette anche di salvarlo), sul computer il download.
+      const touch = window.matchMedia('(pointer: coarse)').matches
+      if (touch && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Rapporto di verifica' }).catch((error: unknown) => {
+          if ((error as { name?: string })?.name !== 'AbortError') download()
+        })
+      } else {
+        download()
+      }
+    } catch {
+      onNotice('Rapporto non disponibile')
+    } finally {
+      setReporting(false)
+    }
+  }
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(primary?.value ?? scan.raw)
@@ -124,6 +158,9 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           <X size={20} />
         </button>
         <div className="result-tools">
+          <button className="icon-btn" type="button" onClick={() => void report()} aria-label="Rapporto di verifica PDF" disabled={reporting}>
+            {reporting ? <LoaderCircle size={18} className="spin" /> : <FileText size={18} />}
+          </button>
           <button className="icon-btn" type="button" onClick={() => void copy()} aria-label="Copia il codice">
             {copied ? <Check size={18} /> : <Copy size={18} />}
           </button>
@@ -144,6 +181,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             <span className="gs1-status-text">
               <strong>{compliance.title}</strong>
               <small>{compliance.detail}</small>
+              {compliance.markup && <Markup text={compliance.markup} />}
             </span>
           </div>
 
@@ -187,7 +225,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
         </div>
 
         {/* Il link del QR Code va valutato prima di tutto: è quello che l'utente sta per aprire. */}
-        {scan.url && <LinkCard url={scan.url} raw={scan.raw.trim()} manual={scan.format === 'Manuale'} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
+        {scan.url && <LinkCard url={scan.url} webRisk={scan.webRisk} raw={scan.raw.trim()} manual={scan.format === 'Manuale'} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 
@@ -238,6 +276,15 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             </ul>
           </div>
         )}
+
+        <button className="result-card report-card" type="button" onClick={() => void report()} disabled={reporting}>
+          <span className="report-icon">{reporting ? <LoaderCircle size={22} className="spin" /> : <FileText size={22} />}</span>
+          <span>
+            <strong>Rapporto di verifica</strong>
+            <small>PDF con l’esito di tutti i controlli</small>
+          </span>
+          <ArrowUpRight size={20} />
+        </button>
 
         {!scan.url && scan.digitalLink && (
           <a className="result-card link-card" href={scan.digitalLink} target="_blank" rel="noreferrer">
@@ -342,6 +389,16 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
   )
 }
 
+/** Dato con la parte errata, che la GS1 Barcode Syntax Engine racchiude tra barre verticali. */
+function Markup({ text }: { text: string }) {
+  const parts = text.split('|')
+  return (
+    <code className="err-markup" aria-label={`Dato con errore: ${text.replace(/\|/g, '')}`}>
+      {parts.map((part, i) => (i % 2 === 1 ? <mark key={i}>{part}</mark> : <span key={i}>{part}</span>))}
+    </code>
+  )
+}
+
 const linkVerdicts: Record<LinkCheck['level'], string> = {
   trusted: 'Link verificato',
   unknown: 'Dominio non riconosciuto',
@@ -353,11 +410,11 @@ const linkVerdicts: Record<LinkCheck['level'], string> = {
  * Link contenuto nel QR Code: separato dalla verifica del prodotto, perché un codice autentico
  * può essere stampato in un QR Code che punta a un sito di phishing.
  */
-function LinkCard({ url, raw, manual, gs1, vbg, safeUrl }: { url: string; raw: string; manual: boolean; gs1: boolean; vbg: Verification | undefined | null; safeUrl?: string }) {
+function LinkCard({ url, webRisk, raw, manual, gs1, vbg, safeUrl }: { url: string; webRisk?: WebRiskResult; raw: string; manual: boolean; gs1: boolean; vbg: Verification | undefined | null; safeUrl?: string }) {
   const [confirm, setConfirm] = useState(false)
   // Si mostra il testo esattamente come scritto nel codice; si apre la forma normalizzata dal browser.
   const shown = sameUrl(raw, url) ? raw : url
-  const check = assessLink(url, vbg)
+  const check = assessLink(url, vbg, webRisk)
   const domain = registrableDomain(check.host)
   // Alternativa sicura: lo stesso codice aperto tramite il resolver GS1 (id.gs1.org).
   const alternative = safeUrl && safeUrl !== url ? safeUrl : undefined

@@ -1333,6 +1333,25 @@
 }
 
 .gs1-status.is-error { background: var(--bad-bg); color: var(--bad); }
+
+.err-markup {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.err-markup mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--bad);
+  color: #fff;
+}
 .gs1-status.is-partial { background: var(--warn-bg); color: var(--warn); }
 .gs1-status.is-none { background: var(--mist); color: var(--ink); }
 .gs1-status.is-manual { background: var(--sky); color: var(--navy); }
@@ -1668,6 +1687,48 @@
   color: var(--navy);
   font-weight: 600;
   text-decoration: none;
+}
+
+.report-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px 14px 14px;
+  text-align: left;
+  color: var(--navy);
+}
+
+.report-card > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+}
+
+.report-card strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.report-card small {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.report-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--sky);
+  color: var(--navy);
+}
+
+.report-card > svg {
+  flex: none;
+  color: var(--orange);
 }
 
 .link-card {

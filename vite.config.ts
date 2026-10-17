@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
   // L'API VbG non abilita il CORS: il browser chiama /api/vbg e il proxy inoltra la richiesta
   // aggiungendo il token lato server. In produzione serve un backend che faccia lo stesso.
   const vbgProxy: Record<string, ProxyOptions> = {
+    // Il controllo dei siti malevoli usa la chiave Google custodita dal Worker pubblicato.
+    '/api/linkcheck': { target: 'https://gs1-vbg-scan.marco-ruberto.workers.dev', changeOrigin: true },
     '/api/vbg': {
       target: 'https://api.vbg.gs1it.org',
       changeOrigin: true,

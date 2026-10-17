@@ -1,9 +1,11 @@
 import type { ScanResult } from '../gs1/interpret'
 import { canVerify, type Verification } from '../gs1/vbg'
+import type { SyntaxCheck } from '../gs1/syntax'
+import type { WebRiskResult } from '../gs1/webRisk'
 import type { StoredSymbol } from './symbolData'
 
 /** `vbg` assente = verifica non ancora arrivata (o non richiesta, vedi needsVerification). */
-export type Scan = ScanResult & { vbg?: Verification; symbol?: StoredSymbol }
+export type Scan = ScanResult & { vbg?: Verification; symbol?: StoredSymbol; syntax?: SyntaxCheck | null; webRisk?: WebRiskResult }
 
 export function needsVerification(scan: Scan) {
   return canVerify(scan.primary?.ai) && (!scan.vbg || scan.vbg.state === 'error')
@@ -87,6 +89,8 @@ export type Compliance = {
   level: 'gs1' | 'error' | 'partial' | 'manual' | 'none'
   title: string
   detail: string
+  /** Dato con la parte errata evidenziata dalla GS1 Barcode Syntax Engine. */
+  markup?: string
 }
 
 /** Simbologie degli standard GS1 (come le nomina formatName / withDisplayFormat). */
@@ -98,11 +102,17 @@ export function gs1Compliance(scan: Scan): Compliance {
     ? 'Contiene un link qualsiasi: non identifica nulla nel sistema GS1.'
     : 'Il contenuto non identifica nulla nel sistema GS1.'
   const badCheck = { level: 'error' as const, title: 'Codice GS1 con errori', detail: 'La cifra di controllo non è corretta: il codice potrebbe essere stampato o letto male.' }
+  // Errore trovato dalla GS1 Barcode Syntax Engine (regole del GS1 Barcode Syntax Dictionary).
+  const syntaxError = scan.syntax && !scan.syntax.ok
+    ? { level: 'error' as const, title: 'Codice GS1 con errori', detail: scan.syntax.message ?? 'I dati non rispettano le regole GS1.', markup: scan.syntax.markup }
+    : null
+  const verified = scan.syntax?.ok ? ' Controllato con la GS1 Barcode Syntax Engine.' : ''
 
   if (scan.format === 'Manuale') {
     if (scan.kind !== 'gs1') return { level: 'none', title: 'Non è un codice GS1', detail: notGs1 }
+    if (syntaxError) return syntaxError
     if (scan.checkDigit === false) return badCheck
-    return { level: 'manual', title: 'Dati in formato GS1', detail: 'Inserito a mano: non c’è un simbolo stampato da verificare.' }
+    return { level: 'manual', title: 'Dati in formato GS1', detail: `Inserito a mano: non c’è un simbolo stampato da verificare.${verified}` }
   }
 
   const gs1Symbol =
@@ -112,8 +122,9 @@ export function gs1Compliance(scan: Scan): Compliance {
     (/Data ?Matrix/i.test(scan.format) && scan.kind === 'gs1' && Boolean(scan.url))
 
   if (gs1Symbol && scan.kind === 'gs1') {
+    if (syntaxError) return syntaxError
     if (scan.checkDigit === false) return badCheck
-    return { level: 'gs1', title: 'Codice Standard GS1', detail: 'Simbologia e dati conformi agli standard GS1.' }
+    return { level: 'gs1', title: 'Codice Standard GS1', detail: `Simbologia e dati conformi agli standard GS1.${verified}` }
   }
   if (scan.kind === 'gs1') {
     return { level: 'partial', title: 'Dati GS1 in un codice non standard', detail: 'I dati seguono il formato GS1, ma il simbolo non è codificato secondo gli standard GS1.' }

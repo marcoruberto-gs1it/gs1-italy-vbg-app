@@ -6,6 +6,7 @@
  * titolare solo se compare tra i link o il sito web che il titolare ha registrato per quel codice.
  */
 import type { Verification } from './vbg'
+import { threatLabel, type WebRiskResult } from './webRisk'
 
 export type LinkLevel = 'trusted' | 'unknown' | 'danger' | 'pending'
 
@@ -69,9 +70,10 @@ export function registeredDomains(vbg?: Verification) {
 
 /**
  * @param vbg verifica VbG del codice contenuto nel link; `undefined` se ancora in corso,
- *            `null` se il link non contiene un codice GS1 (QR Code con un link qualsiasi).
+ *            `null` se il link non contiene un codice GS1 (codice con un link qualsiasi).
+ * @param webRisk esito del controllo negli elenchi di siti malevoli di Google; `undefined` se in corso.
  */
-export function assessLink(url: string, vbg: Verification | undefined | null): LinkCheck {
+export function assessLink(url: string, vbg: Verification | undefined | null, webRisk?: WebRiskResult): LinkCheck {
   let parsed: URL
   try {
     parsed = new URL(url)
@@ -84,14 +86,18 @@ export function assessLink(url: string, vbg: Verification | undefined | null): L
   const warnings: string[] = []
 
   // Segnali di pericolo: valgono anche per i domini registrati.
+  if (webRisk?.threats.length) danger.push(`Google segnala questo sito come ${webRisk.threats.map(threatLabel).join(', ')}.`)
   if (parsed.username || parsed.password || /^[^/]*\/\/[^/]*@/.test(url)) danger.push('L’indirizzo contiene una “@”, un trucco per nascondere il dominio reale.')
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) danger.push('Al posto del nome di un sito c’è un indirizzo IP.')
   if (host.split('.').some((label) => label.startsWith('xn--'))) danger.push('Il dominio contiene caratteri speciali che possono imitare il nome di un marchio noto.')
   if (parsed.protocol !== 'https:') warnings.push('La connessione non è cifrata (http invece di https).')
   if (SHORTENERS.has(host) || SHORTENERS.has(domain)) warnings.push('È un link accorciato: la destinazione reale è nascosta.')
 
+  // Informazione positiva: non cambia il livello, si aggiunge ai motivi.
+  const clean = webRisk?.checked && !webRisk.threats.length ? ['Non risulta negli elenchi di siti malevoli di Google (Web Risk).'] : []
+
   if (GS1_RESOLVERS.has(host) && !danger.length) {
-    return { url, host, level: warnings.length ? 'unknown' : 'trusted', reasons: ['Resolver ufficiale GS1: porta alla pagina scelta dal titolare del codice.', ...warnings] }
+    return { url, host, level: warnings.length ? 'unknown' : 'trusted', reasons: ['Resolver ufficiale GS1: porta alla pagina scelta dal titolare del codice.', ...warnings, ...clean] }
   }
 
   const registered = vbg ? registeredDomains(vbg) : []
@@ -103,7 +109,7 @@ export function assessLink(url: string, vbg: Verification | undefined | null): L
   if (imitates) danger.push(`Il dominio somiglia a ${imitates}, registrato dal titolare, ma non è lo stesso.`)
 
   if (danger.length) return { url, host, level: 'danger', reasons: [...danger, ...warnings], imitates }
-  if (vbg === undefined) return { url, host, level: 'pending', reasons: ['Controllo il dominio nel registro Verified by GS1…'] }
+  if (vbg === undefined || webRisk === undefined) return { url, host, level: 'pending', reasons: ['Controllo il dominio nel registro Verified by GS1 e negli elenchi di siti malevoli…'] }
 
   if (registered.includes(domain)) {
     const owner = vbg?.licensee?.name
@@ -111,7 +117,7 @@ export function assessLink(url: string, vbg: Verification | undefined | null): L
       url,
       host,
       level: warnings.length ? 'unknown' : 'trusted',
-      reasons: [`Il dominio ${domain} è registrato${owner ? ` da ${owner}` : ' dal titolare del codice'} su Verified by GS1.`, ...warnings],
+      reasons: [`Il dominio ${domain} è registrato${owner ? ` da ${owner}` : ' dal titolare del codice'} su Verified by GS1.`, ...warnings, ...clean],
     }
   }
 
@@ -125,5 +131,5 @@ export function assessLink(url: string, vbg: Verification | undefined | null): L
           : registered.length
         ? `Il dominio ${domain} non è tra quelli registrati dal titolare su Verified by GS1.`
         : 'Il titolare non ha registrato siti o link su Verified by GS1: il dominio non è confrontabile.'
-  return { url, host, level: 'unknown', reasons: [why, ...warnings] }
+  return { url, host, level: 'unknown', reasons: [why, ...warnings, ...clean] }
 }

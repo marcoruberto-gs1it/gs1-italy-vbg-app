@@ -13,7 +13,9 @@ import { Scanner } from './components/Scanner'
 import { needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
+import { checkSyntax, loadSyntaxEngine } from './gs1/syntax'
 import { verifyKey } from './gs1/vbg'
+import { checkWebRisk } from './gs1/webRisk'
 import { decodeImage } from './scanner/decodeImage'
 import { formatName } from './scanner/formats'
 import type { Hit } from './scanner/types'
@@ -67,6 +69,7 @@ export default function App() {
 
   useEffect(() => {
     void loadToolkit()
+    void loadSyntaxEngine().catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -122,6 +125,24 @@ export default function App() {
     void verifyKey(primary.ai, primary.value).then(apply)
   }, [])
 
+  // Controllo con la GS1 Barcode Syntax Engine: come la verifica VbG, arriva dopo l'esito.
+  const lint = useCallback((target: Scan) => {
+    if (target.kind !== 'gs1' || target.syntax !== undefined) return
+    void checkSyntax(target).then((syntax) => {
+      setScan((current) => (current?.id === target.id ? { ...current, syntax } : current))
+      setHistory((list) => list.map((item) => (item.id === target.id ? { ...item, syntax } : item)))
+    })
+  }, [])
+
+  // Link del codice: confronto con gli elenchi di siti malevoli di Google (tramite il Worker).
+  const guard = useCallback((target: Scan) => {
+    if (!target.url || target.webRisk) return
+    void checkWebRisk(target.url).then((webRisk) => {
+      setScan((current) => (current?.id === target.id ? { ...current, webRisk } : current))
+      setHistory((list) => list.map((item) => (item.id === target.id ? { ...item, webRisk } : item)))
+    })
+  }, [])
+
   const show = useCallback(
     (scanned: Scan, center?: { x: number; y: number }) => {
       const result = withDisplayFormat(scanned)
@@ -129,8 +150,10 @@ export default function App() {
       setScan(result)
       setHistory((list) => [result, ...list.filter((item) => item.raw !== result.raw)].slice(0, 30))
       verify(result)
+      lint(result)
+      guard(result)
     },
-    [verify],
+    [verify, lint, guard],
   )
 
   const onRead = useCallback(
@@ -190,6 +213,8 @@ export default function App() {
     setOrigin({ x: window.innerWidth / 2, y: window.innerHeight })
     setScan(item)
     verify(item)
+    lint(item)
+    guard(item)
   }
 
   return (
