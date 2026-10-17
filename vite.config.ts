@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    // Su GitHub Pages l'app vive in /<nome-repo>/: il workflow imposta BASE_PATH.
+    base: process.env.BASE_PATH ?? '/',
     plugins: [react(), basicSsl()],
     // allowedHosts: consente il tunnel HTTPS di `npm run tunnel` (certificato valido → il permesso fotocamera resta salvato).
     server: { host: true, proxy: vbgProxy, allowedHosts: ['.trycloudflare.com'] },

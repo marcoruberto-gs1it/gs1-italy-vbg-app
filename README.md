@@ -53,6 +53,14 @@ cp .env.example .env.local   # poi inserisci VBG_API_TOKEN
 - In sviluppo (`npm run dev`, `npm run preview`) il proxy è quello di Vite.
 - In produzione l'app gira su **Cloudflare Workers** (piano gratuito): https://gs1-vbg-scan.marco-ruberto.workers.dev
 
+## Pubblicazione su GitHub Pages
+
+A ogni push su `main` il workflow `.github/workflows/pages.yml` compila l'app e la pubblica su https://marcoruberto-gs1it.github.io/gs1-italy-vbg-app/.
+
+- `BASE_PATH` imposta il percorso `/gs1-italy-vbg-app/`.
+- `VITE_VBG_BASE` punta il frontend al proxy del Cloudflare Worker, perché Pages serve solo file statici.
+- Il Worker accetta chiamate da altri domini solo da `https://marcoruberto-gs1it.github.io` (`ALLOWED_ORIGINS` in `worker/index.ts`). Se cambia il dominio, aggiornalo lì e ripubblica il Worker.
+
 ## Pubblicazione su Cloudflare
 
 `worker/index.ts` serve l'app (build di Vite, come file statici) e risponde solo su `/api/vbg/<chiave>/`. Aggiunge il token, che è un secret di Cloudflare, e accetta un solo codice per richiesta, solo in POST e solo sugli endpoint di lettura dell'app, con un limite di 30 richieste al minuto per IP. La configurazione è in `wrangler.jsonc`.
