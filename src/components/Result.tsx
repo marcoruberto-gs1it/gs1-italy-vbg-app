@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ArrowUpRight, Check, Copy, ImageOff, Link2, LoaderCircle, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldAlert, ShieldCheck, TriangleAlert, X } from 'lucide-react'
+import { ArrowUpRight, BadgeCheck, Check, CircleSlash, Copy, ImageOff, Keyboard, Link2, LoaderCircle, Maximize2, Minus, RotateCcw, ScanBarcode, Share2, ShieldAlert, ShieldCheck, TriangleAlert, X } from 'lucide-react'
 import { assessLink, registrableDomain, type LinkCheck } from '../gs1/linkSafety'
 import { canVerify, type Verification } from '../gs1/vbg'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
-import { codeType, formatKind, titleOf, type Scan } from './scan'
+import { codeType, formatKind, gs1Compliance, titleOf, type Scan } from './scan'
+import { Symbol2D } from './symbol'
 
 type Props = {
   scan: Scan
@@ -40,6 +41,10 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
   const groups = digits ? groupDigits(primary?.ai === '01' ? barDigits : digits) : null
   const issuer = vbg?.licensee?.mo ?? scan.issuer
   const type = codeType(scan)
+  const compliance = gs1Compliance(scan)
+  // Si disegna solo ciò che è stato davvero scansionato: il simbolo 2D modulo per modulo,
+  // oppure le barre EAN/UPC-A, la cui codifica è univoca. Mai un barcode 1D al posto di un codice 2D.
+  const drawBars = !scan.symbol && Boolean(barDigits) && /^(EAN-13|EAN-8|UPC-A)$/.test(scan.format)
   // Si condivide il link canonico GS1 quando c'è, mai un dominio non verificato al posto suo.
   const shareUrl = scan.digitalLink ?? scan.url
   const canShare = typeof navigator.share === 'function'
@@ -63,6 +68,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           .from('.code-type-icon, .code-type-text > *, .title', { y: 12, opacity: 0, duration: 0.45, stagger: 0.06 }, '-=0.35')
           .from('.digit-group span', { y: 14, opacity: 0, duration: 0.35, stagger: 0.025 }, '<')
           .from('.bars rect', { scaleY: 0, transformOrigin: '50% 100%', duration: 0.3, stagger: 0.012 }, '<0.1')
+          .fromTo('.symbol2d', { clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)', duration: 0.7, ease: 'power2.inOut' }, '<')
+          .from('.gs1-status', { y: -10, opacity: 0, duration: 0.45 }, '<')
           .from('.chips > *, .result-card', { y: 18, opacity: 0, duration: 0.45, stagger: 0.07 }, '-=0.3')
       })
       return () => mm.revert()
@@ -130,6 +137,16 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
       <div className="result-body">
         <div className="hero">
+          <div className={`gs1-status is-${compliance.level}`} role="status">
+            <span className="gs1-status-icon" aria-hidden="true">
+              {compliance.level === 'gs1' ? <BadgeCheck size={22} /> : compliance.level === 'manual' ? <Keyboard size={20} /> : compliance.level === 'none' ? <CircleSlash size={20} /> : <TriangleAlert size={20} />}
+            </span>
+            <span className="gs1-status-text">
+              <strong>{compliance.title}</strong>
+              <small>{compliance.detail}</small>
+            </span>
+          </div>
+
           <div className="code-type">
             <span className="code-type-icon" aria-hidden="true"><FormatIcon kind={formatKind(scan.format)} /></span>
             <div className="code-type-text">
@@ -147,6 +164,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             </div>
           </div>
 
+          {scan.symbol && <Symbol2D symbol={scan.symbol} label={type.title} />}
+
           {groups ? (
             <h1 className={`digits ${(digits?.length ?? 0) >= 18 ? 'is-xlong' : (digits?.length ?? 0) > 13 ? 'is-long' : ''}`} aria-label={digits ?? undefined}>
               {groups.map((group, g) => (
@@ -159,7 +178,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             <h1 className={`title ${scan.kind === 'text' ? 'is-text' : ''}`}>{primary ? primary.display : titleOf(scan)}</h1>
           )}
 
-          {barDigits && <Bars digits={barDigits} />}
+          {drawBars && <Bars digits={barDigits} />}
 
           <div className="chips">
             {scan.checkDigit === true && <span className="chip ok"><ShieldCheck size={14} /> Cifra di controllo valida</span>}

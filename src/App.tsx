@@ -11,6 +11,7 @@ import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
 import { needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { packSymbol } from './components/symbol'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { verifyKey } from './gs1/vbg'
 import { decodeImage } from './scanner/decodeImage'
@@ -137,7 +138,8 @@ export default function App() {
       setReading(true)
       const started = performance.now()
       void interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))
-        .then((result) => {
+        .then((interpreted) => {
+          const result = { ...interpreted, symbol: packSymbol(hit.symbol) }
           window.setTimeout(() => {
             show(result, center)
             setReading(false)
@@ -181,7 +183,7 @@ export default function App() {
       setNotice('Nessun codice trovato nella foto')
       return
     }
-    show(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier)))
+    show({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) })
   }
 
   function openFromHistory(item: Scan) {

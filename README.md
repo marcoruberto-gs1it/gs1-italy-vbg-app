@@ -41,6 +41,18 @@ Per l'esperienza a schermo intero completa, su telefono usa "Aggiungi a schermat
 - **Categorie GPC**: `src/vendor/gs1/gpc-bricks-it.json` contiene i nomi italiani dei brick GPC (pubblicazione GS1 di maggio 2026, traduzione di GS1 Italy), caricati solo alla prima verifica.
 - **Verified by GS1**: `src/gs1/vbg.ts` interroga l'API di GS1 Italy (`https://api.vbg.gs1it.org/v2`, endpoint `gtin`, `gln`, `sscc`, `grai`, …) e mostra se il codice è verificato, solo registrato o non valido, con prodotto, titolare e link del produttore.
 
+## Conformità GS1 e simbolo letto
+
+In cima all'esito una fascia dice se il codice fa parte degli standard GS1 (`gs1Compliance` in `src/components/scan.ts`):
+
+- **Codice Standard GS1**: simbologia GS1 (EAN/UPC, ITF-14, GS1-128, GS1 DataBar, GS1 DataMatrix, QR Code Standard GS1, oppure GS1 Digital Link in un Data Matrix) con dati GS1 validi.
+- **Codice GS1 con errori**: simbologia GS1 ma cifra di controllo errata.
+- **Dati GS1 in un codice non standard**: dati in formato GS1 in un simbolo non codificato secondo lo standard (es. Data Matrix senza FNC1, Code 128 senza FNC1).
+- **Non è un codice GS1**: link qualsiasi o testo.
+- **Dati in formato GS1**: inserito a mano, nessun simbolo da verificare.
+
+Il simbolo mostrato è quello realmente scansionato: i codici 2D sono ridisegnati modulo per modulo dalla matrice restituita dal lettore (`src/components/symbol.tsx`, salvata anche in cronologia). Le barre vengono disegnate solo per EAN-13, EAN-8 e UPC-A, la cui codifica è univoca. Per gli altri barcode 1D non si disegna nulla, piuttosto che un simbolo diverso da quello letto.
+
 ## Protezione da quishing e phishing
 
 Un GS1 Digital Link può stare su qualsiasi dominio, quindi un QR Code Standard GS1 con un GTIN autentico può comunque puntare a un sito truffa. `src/gs1/linkSafety.ts` valuta ogni link letto e la card "Link nel QR Code Standard GS1" (subito sotto il codice) lo mostra separato dalla verifica del prodotto:

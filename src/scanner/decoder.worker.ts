@@ -32,7 +32,15 @@ self.onmessage = async ({ data }: MessageEvent<DecoderRequest>) => {
     post({
       type: 'result',
       id: data.id,
-      hit: hit ? { text: hit.text, format: hit.format, symbologyIdentifier: hit.symbologyIdentifier, position: hit.position } : null,
+      hit: hit
+        ? {
+            text: hit.text,
+            format: hit.format,
+            symbologyIdentifier: hit.symbologyIdentifier,
+            position: hit.position,
+            symbol: hit.symbol?.width ? { width: hit.symbol.width, height: hit.symbol.height, data: new Uint8ClampedArray(hit.symbol.data) } : undefined,
+          }
+        : null,
     })
   } catch (error) {
     post({ type: 'result', id: data.id, hit: null, error: String(error) })

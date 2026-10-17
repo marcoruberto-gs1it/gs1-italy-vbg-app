@@ -1274,6 +1274,86 @@
   box-shadow: var(--shadow);
 }
 
+.gs1-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  text-align: left;
+  background: var(--mist);
+  color: var(--muted);
+}
+
+.gs1-status-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.gs1-status-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gs1-status-text strong {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.gs1-status-text small {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+.gs1-status.is-gs1 {
+  background: var(--navy);
+  color: #fff;
+}
+
+.gs1-status.is-gs1 .gs1-status-icon {
+  background: var(--orange);
+  color: #fff;
+}
+
+.gs1-status.is-gs1 small {
+  color: #fff;
+  opacity: 0.8;
+}
+
+.gs1-status.is-error { background: var(--bad-bg); color: var(--bad); }
+.gs1-status.is-partial { background: var(--warn-bg); color: var(--warn); }
+.gs1-status.is-none { background: var(--mist); color: var(--ink); }
+.gs1-status.is-manual { background: var(--sky); color: var(--navy); }
+
+.symbol2d {
+  width: min(62%, 220px);
+  height: auto;
+  max-height: 240px;
+  margin-top: 16px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1.5px var(--mist);
+}
+
+.symbol2d.is-wide {
+  width: min(92%, 360px);
+}
+
+.symbol2d path {
+  fill: var(--ink);
+}
+
 .code-type {
   position: relative;
   display: grid;
