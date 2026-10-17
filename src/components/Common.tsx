@@ -74,7 +74,7 @@ export function ManualForm({ onSubmit }: { onSubmit: (value: string) => Promise<
   const [value, setValue] = useState('')
   return (
     <form className="manual" onSubmit={(e) => { e.preventDefault(); if (value.trim()) void onSubmit(value.trim()) }}>
-      <p className="manual-hint">Il numero sotto il codice a barre, una stringa GS1 come (01)…(17)… oppure un link.</p>
+      <p className="manual-hint">Il numero sotto il barcode, una stringa GS1 come (01)…(17)… oppure un link.</p>
       <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="8001234567897" inputMode="text" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Codice" />
       <button className="cta" type="submit" disabled={!value.trim()}>Leggi il codice</button>
     </form>

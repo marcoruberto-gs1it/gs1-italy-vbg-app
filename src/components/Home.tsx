@@ -1,12 +1,11 @@
 import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ChevronRight, Keyboard, RotateCcw, ScanBarcode } from 'lucide-react'
+import { Keyboard, RotateCcw, ScanBarcode } from 'lucide-react'
 import type { CameraError } from '../scanner/useScanner'
 import type { InfoTopic } from './Chrome'
 import { Footer } from './Chrome'
-import { FormatIcon, HeroBadge, IllCodes, IllPhone, IllShield } from './Illustrations'
-import { formatKind, titleOf, type Scan } from './scan'
+import { HeroBadge, IllCodes, IllPhone, IllShield } from './Illustrations'
 
 const offText: Partial<Record<CameraError, string>> = {
   denied: 'Consenti l’accesso alla fotocamera nelle impostazioni del browser per tornare a scansionare.',
@@ -17,14 +16,12 @@ const offText: Partial<Record<CameraError, string>> = {
 
 type Props = {
   cameraIssue: CameraError | null
-  last: Scan | null
   onScan: () => void
   onManual: () => void
-  onOpen: (scan: Scan) => void
   onInfo: (topic: InfoTopic) => void
 }
 
-export function Home({ cameraIssue, last, onScan, onManual, onOpen, onInfo }: Props) {
+export function Home({ cameraIssue, onScan, onManual, onInfo }: Props) {
   const scope = useRef<HTMLDivElement>(null)
   const off = cameraIssue ? offText[cameraIssue] : undefined
   const canRetry = cameraIssue === 'denied' || cameraIssue === 'notfound'
@@ -67,7 +64,7 @@ export function Home({ cameraIssue, last, onScan, onManual, onOpen, onInfo }: Pr
             <br />
             <em>{off ? 'non attiva' : 'pronto'}</em>
           </h1>
-          <p>{off ?? 'Inquadra un codice a barre o un QR GS1 e leggi subito i dati del prodotto.'}</p>
+          <p>{off ?? 'Inquadra un barcode o un QR Code GS1 e leggi subito i dati del prodotto.'}</p>
         </div>
         <HeroBadge state={off ? 'off' : 'ready'} />
         {off && !canRetry ? (
@@ -78,20 +75,6 @@ export function Home({ cameraIssue, last, onScan, onManual, onOpen, onInfo }: Pr
           <button className="cta" type="button" onClick={onScan}><ScanBarcode size={21} /> Scansiona un codice</button>
         )}
       </section>
-
-      {last && (
-        <section className="reveal">
-          <h2 className="section-label">Ultima scansione</h2>
-          <button className="last-card" type="button" onClick={() => onOpen(last)}>
-            <span className="tile"><FormatIcon kind={formatKind(last.format)} /></span>
-            <span className="last-text">
-              <strong>{titleOf(last)}</strong>
-              <small>{last.format}{last.issuer ? ` · ${last.issuer}` : ''}</small>
-            </span>
-            <ChevronRight size={20} className="chev" />
-          </button>
-        </section>
-      )}
 
       <section>
         <h2 className="section-label reveal">Informazioni</h2>

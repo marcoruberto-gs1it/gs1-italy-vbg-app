@@ -401,19 +401,6 @@
   font-weight: 600;
 }
 
-.footer-oss {
-  margin-top: 22px;
-  line-height: 1.55;
-}
-
-.footer-oss a {
-  color: var(--navy);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: rgba(0, 44, 108, 0.25);
-  text-underline-offset: 3px;
-}
-
 .footer-address {
   margin-top: 18px;
   padding-top: 18px;
@@ -426,6 +413,20 @@
   margin-top: 6px;
   font-weight: 600;
   color: var(--navy);
+}
+
+.footer .footer-site {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 /* ───────── Tab bar ───────── */

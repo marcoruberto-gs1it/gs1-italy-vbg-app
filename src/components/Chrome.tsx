@@ -3,7 +3,7 @@ import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ArrowUpRight, History, House, ImageUp, Info, Keyboard, Layers, Menu, ScanBarcode, ShieldCheck, X } from 'lucide-react'
 import logo from '../assets/gs1-italy-logo.png'
-import { GS1_IT, legalLinks, openSourceLinks, serviceLinks, socialLinks } from '../lib/links'
+import { GS1_IT, legalLinks, serviceLinks, socialLinks } from '../lib/links'
 
 const YEAR = new Date().getFullYear()
 
@@ -138,23 +138,15 @@ export function Footer() {
         ))}
       </div>
 
-      <p className="footer-oss">
-        Dati GS1 interpretati con{' '}
-        {openSourceLinks.map((link, i) => (
-          <span key={link.href}>
-            <a href={link.href} target="_blank" rel="noreferrer">{link.label}</a>
-            {i < openSourceLinks.length - 1 ? ', ' : '.'}
-          </span>
-        ))}{' '}
-        La lettura avviene sul dispositivo; la verifica interroga il registro Verified by GS1 di GS1 Italy.
-      </p>
-
       <address className="footer-address">
         GS1 Italy · Via Paleocapa 7, 20121 Milano
         <br />
         Codice fiscale 80140330152
       </address>
       <p className="footer-copy">© {YEAR} GS1 Italy</p>
+      <a className="footer-site" href={GS1_IT} target="_blank" rel="noreferrer">
+        Vai al sito di GS1 Italy <ArrowUpRight size={17} />
+      </a>
     </footer>
   )
 }

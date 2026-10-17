@@ -2,7 +2,7 @@ export const GS1_IT = 'https://gs1it.org'
 
 export const serviceLinks = [
   { label: 'Calcola la cifra di controllo', href: `${GS1_IT}/assistenza/calcolo-cifra-di-controllo/` },
-  { label: 'GEPIR · Chi usa il codice a barre', href: `${GS1_IT}/servizi/gepir/` },
+  { label: 'Verified by GS1 (VbG)', href: `${GS1_IT}/servizi/verified-by-gs1/` },
   { label: 'Ti serve un barcode GS1', href: `${GS1_IT}/serve-codice-a-barre/` },
   { label: 'FAQ', href: `${GS1_IT}/assistenza/faq/` },
 ]
@@ -21,8 +21,3 @@ export const socialLinks = [
   { label: 'Facebook', href: 'https://facebook.com/GS1Italy' },
 ]
 
-export const openSourceLinks = [
-  { label: 'GS1 Digital Link Toolkit', href: 'https://github.com/gs1/GS1DigitalLinkToolkit.js' },
-  { label: 'interpretGS1scan', href: 'https://github.com/gs1/interpretGS1scan' },
-  { label: 'Verified by GS1 demo', href: 'https://github.com/gs1/vbg-l2sd-demo' },
-]

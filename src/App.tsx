@@ -197,10 +197,8 @@ export default function App() {
         {tab === 'home' ? (
           <Home
             cameraIssue={cameraIssue}
-            last={history[0] ?? null}
             onScan={openScanner}
             onManual={() => setSheet({ type: 'manual' })}
-            onOpen={openFromHistory}
             onInfo={(topic) => setSheet({ type: 'info', topic })}
           />
         ) : (
