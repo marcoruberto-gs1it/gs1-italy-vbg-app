@@ -78,6 +78,10 @@ export function codeType(scan: Scan): CodeType {
  * Un QR Code qualsiasi non viene chiamato così, per non attribuirgli una conformità che non ha.
  */
 export function withDisplayFormat<T extends Scan>(scan: T): T {
+  // ITF con un GTIN a 14 cifre: è un ITF-14, simbologia degli standard GS1 (General Specifications §5.3).
+  if (scan.format === 'ITF' && scan.primary?.ai === '01' && scan.primary.value.length === 14) return { ...scan, format: 'ITF-14' }
+  // Data Matrix con GS1 Digital Link: ammesso dagli standard GS1 (General Specifications §5.9).
+  if (scan.format === 'Data Matrix' && scan.kind === 'gs1' && scan.url) return { ...scan, format: 'Data Matrix con GS1 Digital Link' }
   if (!/QR/i.test(scan.format) || scan.format === 'QR Code Standard GS1') return scan
   // QR Code con GS1 Digital Link: conforme allo standard GS1.
   if (scan.kind === 'gs1' && scan.url) return { ...scan, format: 'QR Code Standard GS1' }
@@ -93,8 +97,12 @@ export type Compliance = {
   markup?: string
 }
 
-/** Simbologie degli standard GS1 (come le nomina formatName / withDisplayFormat). */
-const GS1_SYMBOLOGIES = /^(EAN-13|EAN-8|UPC-A|UPC-E|ITF-14|GS1-128|GS1 DataBar.*|GS1 DataMatrix|QR Code Standard GS1)$/
+/**
+ * Simbologie degli standard GS1 (GS1 General Specifications §5.1.1), come le nominano formatName e
+ * withDisplayFormat. Non ne fanno parte Code 128, Code 39, Code 93, Codabar, ITF di altra lunghezza,
+ * PDF417, MaxiCode, Aztec (anche con dati GS1), Micro QR e rMQR.
+ */
+const GS1_SYMBOLOGIES = /^(EAN-13|EAN-8|UPC-A|UPC-E|ITF-14|GS1-128|GS1 DataBar.*|GS1 DataMatrix|QR Code Standard GS1|Data Matrix con GS1 Digital Link)$/
 
 /** Il codice letto fa parte degli standard GS1? Valuta simbologia, contenuto e cifra di controllo. */
 export function gs1Compliance(scan: Scan): Compliance {

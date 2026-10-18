@@ -98,7 +98,7 @@ const EVENT_FIELDS: Record<string, FieldRule> = {
   check_digit_ok: 'bool', syntax_ok: 'bool', syntax_error: 300,
   primary_ai: 4, primary_key: 90, ai_list: 'strings', issuer_mo: 120,
   vbg_state: 10, vbg_complete: 'bool', vbg_core_count: 'int', vbg_error_code: 10,
-  company_prefix: 20, licensee_name: 200, licensee_gln: 13, licensing_mo: 80,
+  company_prefix: 20, licensee_name: 200, brand_name: 120, licensee_gln: 13, licensing_mo: 80,
   gpc_brick: 10, gpc_brick_name: 200, gpc_segment: 200,
   link_domain: 253, link_level: 10, link_imitates: 253, link_threats: 'strings',
 }
@@ -144,13 +144,24 @@ async function events(request: Request, env: Env, ctx: ExecutionContext): Promis
 
   if (env.SUPABASE_URL && env.SUPABASE_SECRET_KEY) {
     // Si risponde subito; la scrittura prosegue in background.
-    ctx.waitUntil(
+    const insert = (body: Record<string, unknown>) =>
       fetch(`${env.SUPABASE_URL}/rest/v1/scan_events`, {
         method: 'POST',
-        headers: { apikey: env.SUPABASE_SECRET_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(row),
-      }).then(async (res) => {
-        if (!res.ok) console.error('Supabase', res.status, await res.text())
+        headers: { apikey: env.SUPABASE_SECRET_KEY!, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(body),
+      })
+    ctx.waitUntil(
+      insert(row).then(async (res) => {
+        if (res.ok) return
+        const text = await res.text()
+        // Colonna aggiunta di recente non ancora creata nel database (PGRST204): si salva la scansione senza.
+        if (res.status === 400 && text.includes('PGRST204') && 'brand_name' in row) {
+          const { brand_name: _omit, ...rest } = row
+          const retry = await insert(rest)
+          if (!retry.ok) console.error('Supabase', retry.status, await retry.text())
+          return
+        }
+        console.error('Supabase', res.status, text)
       }),
     )
   }

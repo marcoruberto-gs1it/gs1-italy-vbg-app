@@ -53,6 +53,7 @@ export function buildEvent(scan: Scan, source: ScanSource) {
     vbg_error_code: v?.code ?? null,
     company_prefix: v?.licensee?.prefix ?? null,
     licensee_name: v?.licensee?.name ?? null,
+    brand_name: v?.brand ?? null,
     licensee_gln: v?.licensee?.gln ?? null,
     licensing_mo: v?.licensee?.mo ?? null,
     gpc_brick: v?.category ?? null,

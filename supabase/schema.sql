@@ -46,6 +46,7 @@ create table if not exists public.scan_events (
   vbg_error_code    text,          -- es. E039 (numero non assegnato)
   company_prefix    text,          -- licenza GS1 del titolare (GS1 Company Prefix)
   licensee_name     text,
+  brand_name        text,          -- marchio del prodotto (da Verified by GS1)
   licensee_gln      text,
   licensing_mo      text,
   gpc_brick         text,
@@ -58,6 +59,9 @@ create table if not exists public.scan_events (
   link_imitates     text,          -- dominio registrato a cui somiglia
   link_threats      text[]         -- segnalazioni di Google Web Risk
 );
+
+-- Colonne aggiunte dopo la prima versione (per i database già creati).
+alter table public.scan_events add column if not exists brand_name text;
 
 comment on table public.scan_events is
   'Una riga per scansione completata nell''app VbG Scan. Nessun dato personale: niente IP né identificativi; posizione a livello di regione dedotta da Cloudflare.';
