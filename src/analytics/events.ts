@@ -35,7 +35,7 @@ export function buildEvent(scan: Scan, source: ScanSource) {
   return {
     source,
     device: window.matchMedia('(pointer: coarse)').matches ? 'mobile' : 'desktop',
-    app_version: __APP_VERSION__,
+    app_version: `${__APP_RELEASE__}+${__APP_VERSION__}`,
     symbology: source === 'manual' ? null : codeType(scan).title,
     is_2d: source === 'manual' ? null : Boolean(scan.symbol) || /QR|Matrix|Aztec|PDF417|MaxiCode|Codice con/i.test(scan.format),
     content_kind: scan.kind,

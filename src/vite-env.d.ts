@@ -10,3 +10,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** Versione leggibile dell'app (package.json), es. 1.0.1. */
+declare const __APP_RELEASE__: string

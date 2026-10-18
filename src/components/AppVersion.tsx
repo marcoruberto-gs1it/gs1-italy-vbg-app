@@ -19,7 +19,7 @@ export function AppVersion() {
   }
   return (
     <div className="app-version">
-      <span>Versione <code>{__APP_VERSION__}</code></span>
+      <span title={`build ${__APP_VERSION__}`}>v. {__APP_RELEASE__}</span>
       <button type="button" onClick={() => void check()} disabled={state === 'checking'}>
         {state === 'latest' ? <><Check size={15} /> È l’ultima</> : state === 'offline' ? 'Sei offline: riprova' : <><RefreshCw size={15} className={state === 'checking' ? 'spin' : undefined} /> Cerca aggiornamenti</>}
       </button>
