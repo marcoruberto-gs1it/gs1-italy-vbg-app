@@ -20,6 +20,7 @@ import { verifyKey } from './gs1/vbg'
 import { checkWebRisk } from './gs1/webRisk'
 import { decodeImage } from './scanner/decodeImage'
 import { formatName } from './scanner/formats'
+import { alreadyReloaded, loadVersion, useUpdateAvailable } from './lib/update'
 import type { Hit } from './scanner/types'
 import type { CameraError } from './scanner/useScanner'
 
@@ -245,6 +246,13 @@ export default function App() {
     guard(item)
   }
 
+  // Versione più nuova pubblicata: se l'app è ferma sulla home si ricarica da sola, altrimenti lo propone.
+  const update = useUpdateAvailable()
+  const idle = tab === 'home' && !scan && !scannerOpen
+  useEffect(() => {
+    if (update && idle) loadVersion(update, true)
+  }, [update, idle])
+
   return (
     <div className="shell">
       <div className="main" inert={scannerOpen || Boolean(scan)} onScroll={(e) => setRaised(e.currentTarget.scrollTop > 4)}>
@@ -326,6 +334,12 @@ export default function App() {
 
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void readFile(e.target.files?.[0]); e.target.value = '' }} />
       {notice && <div className="toast" role="status">{notice}</div>}
+      {update && (!idle || alreadyReloaded(update)) && (
+        <div className="update-toast" role="status">
+          <span>È disponibile una nuova versione dell’app</span>
+          <button type="button" onClick={() => loadVersion(update)}>Aggiorna</button>
+        </div>
+      )}
     </div>
   )
 }
