@@ -2552,6 +2552,36 @@
   animation: fade-in 250ms both;
 }
 
+/* Versione dell'app nel menu */
+.app-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px 4px 4px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.app-version code {
+  color: var(--ink);
+}
+
+.app-version button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--mist);
+  color: var(--navy);
+  font-weight: 700;
+}
+
 /* Nuova versione disponibile */
 .update-toast {
   position: fixed;

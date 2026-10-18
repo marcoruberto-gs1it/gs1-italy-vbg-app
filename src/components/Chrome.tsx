@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { AppVersion } from './AppVersion'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ArrowUpRight, History, House, ImageUp, Info, Keyboard, Layers, Lock, Menu, ScanBarcode, ShieldCheck, X } from 'lucide-react'
@@ -82,6 +83,8 @@ export function Drawer({ onClose, onPrivacy, onScan, onManual, onImage, onTab, o
         {serviceLinks.map((link) => (
           <a key={link.href} className="drawer-item ext" href={link.href} target="_blank" rel="noreferrer">{link.label} <ArrowUpRight size={16} /></a>
         ))}
+
+        <AppVersion />
       </nav>
     </div>
   )

@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react'
 
 const CHECK_EVERY = 15 * 60_000
 
+/** Versione pubblicata online (null se non raggiungibile). */
+export async function fetchLatestVersion(): Promise<string | null> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const { version } = (await res.json()) as { version?: string }
+    return version ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * C'è una versione dell'app più nuova di quella aperta? L'app installata nella schermata Home
  * (o una scheda lasciata aperta) non si ricarica da sola: si controlla version.json all'avvio,
@@ -14,14 +26,9 @@ export function useUpdateAvailable() {
     const check = async () => {
       if (Date.now() - last < 60_000) return
       last = Date.now()
-      try {
-        const res = await fetch(`${import.meta.env.BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' })
-        if (!res.ok) return
-        const { version } = (await res.json()) as { version?: string }
-        if (version && version !== __APP_VERSION__) setAvailable(version)
-      } catch {
-        // Offline o file assente (sviluppo): nessun avviso.
-      }
+      // Offline o file assente (sviluppo): nessun avviso.
+      const version = await fetchLatestVersion()
+      if (version && version !== __APP_VERSION__) setAvailable(version)
     }
     const onVisible = () => document.visibilityState === 'visible' && void check()
     void check()
