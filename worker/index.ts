@@ -135,11 +135,13 @@ async function events(request: Request, env: Env, ctx: ExecutionContext): Promis
   }
   if (!row.source) return json(request, 400, 'Richiesta non valida')
 
-  // Posizione a livello di regione, dedotta da Cloudflare (nessun permesso chiesto all'utente).
+  // Posizione approssimativa (paese, regione, città) dedotta da Cloudflare: nessun permesso chiesto all'utente.
   const cf = request.cf as IncomingRequestCfProperties | undefined
   row.country = cf?.country ?? null
   row.region_code = cf?.regionCode ?? null
   row.region = cf?.region ?? null
+  // Città approssimativa (dalla connessione, non dal GPS): con le reti mobili spesso è la sede del gestore.
+  row.city = cf?.city ?? null
   row.is_eu = cf?.isEUCountry === '1'
 
   if (env.SUPABASE_URL && env.SUPABASE_SECRET_KEY) {

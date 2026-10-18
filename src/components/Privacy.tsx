@@ -77,14 +77,15 @@ export function PrivacyContent() {
         <h4><ChartColumn size={16} /> Statistiche sulle scansioni</h4>
         <p>Per ogni scansione registriamo un evento con:</p>
         <ul className="legal-list">
-          <li>data e ora, paese e regione;</li>
+          <li>data e ora, paese, regione e città approssimativa;</li>
           <li>tipo di dispositivo (telefono o computer) e modalità di lettura (fotocamera, foto, inserimento manuale);</li>
           <li>tipo di codice, esito dei controlli di conformità GS1 e codice letto (GTIN o altra chiave GS1);</li>
           <li>esito della verifica Verified by GS1: titolare del codice, categoria del prodotto, completezza della scheda;</li>
           <li>solo il <strong>dominio</strong> dell’eventuale link (non l’indirizzo completo) e l’esito del controllo di sicurezza.</li>
         </ul>
         <p>
-          Paese e regione sono dedotti da Cloudflare dall’indirizzo IP della connessione, senza chiederti la posizione. <strong>L’indirizzo IP
+          Paese, regione e città sono dedotti da Cloudflare dall’indirizzo IP della connessione, senza chiederti la posizione e senza GPS:
+          la città è approssimativa (con le reti mobili spesso è quella del gestore). <strong>L’indirizzo IP
           non viene salvato</strong> e l’evento non contiene identificativi del dispositivo o della persona: non è possibile ricondurlo a te.
         </p>
         <p>
@@ -117,7 +118,7 @@ export function PrivacyContent() {
         <h3>3. Fornitori e trasferimenti</h3>
         <p>I dati sono trattati, per conto di GS1 Italy o come titolari autonomi per i propri servizi, da:</p>
         <ul className="legal-list">
-          <li><strong>Cloudflare, Inc.</strong>: pubblicazione dell’app, collegamento ai servizi di verifica, deduzione della regione;</li>
+          <li><strong>Cloudflare, Inc.</strong>: pubblicazione dell’app, collegamento ai servizi di verifica, deduzione della posizione approssimativa;</li>
           <li><strong>Supabase, Inc.</strong>: archivio delle statistiche, su server nell’Unione europea (Francoforte);</li>
           <li><strong>GitHub, Inc.</strong>: pubblicazione dell’app;</li>
           <li><strong>Google LLC</strong>: caratteri tipografici (Google Fonts) e controllo dei siti pericolosi (Google Web Risk).</li>

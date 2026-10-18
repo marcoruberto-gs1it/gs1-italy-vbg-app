@@ -7,7 +7,7 @@
 --  · scrive solo il Cloudflare Worker, con la chiave segreta (che scavalca RLS);
 --  · il pubblico (chiavi anon/publishable) non può leggere né scrivere nulla;
 --  · nessun dato personale: niente IP, niente identificativi di dispositivo,
---    dei link si salva solo il dominio; posizione a livello di regione (da Cloudflare);
+--    dei link si salva solo il dominio; posizione approssimativa (paese, regione, città) da Cloudflare;
 --  · le viste aggregate mostrano solo gruppi con almeno 10 letture.
 -- ============================================================================
 
@@ -19,6 +19,7 @@ create table if not exists public.scan_events (
   country           text,          -- ISO 3166-1, es. IT
   region_code       text,          -- ISO 3166-2, es. 25 (Lombardia)
   region            text,          -- nome della regione, es. Lombardy
+  city              text,          -- città approssimativa (Cloudflare, dalla connessione: non dal GPS)
   is_eu             boolean,
 
   -- Come
@@ -66,9 +67,10 @@ create table if not exists public.scan_events (
 alter table public.scan_events add column if not exists brand_name text;
 alter table public.scan_events add column if not exists vbg_record_status text;
 alter table public.scan_events add column if not exists vbg_licence_status text;
+alter table public.scan_events add column if not exists city text;
 
 comment on table public.scan_events is
-  'Una riga per scansione completata nell''app VbG Scan. Nessun dato personale: niente IP né identificativi; posizione a livello di regione dedotta da Cloudflare.';
+  'Una riga per scansione completata nell''app VbG Scan. Nessun dato personale: niente IP né identificativi; posizione approssimativa (paese, regione, città) dedotta da Cloudflare.';
 
 create index if not exists scan_events_created_at_idx   on public.scan_events (created_at);
 create index if not exists scan_events_primary_key_idx  on public.scan_events (primary_key);
