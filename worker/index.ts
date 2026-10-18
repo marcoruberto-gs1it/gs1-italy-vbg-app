@@ -98,7 +98,7 @@ const EVENT_FIELDS: Record<string, FieldRule> = {
   check_digit_ok: 'bool', syntax_ok: 'bool', syntax_error: 300,
   primary_ai: 4, primary_key: 90, ai_list: 'strings', issuer_mo: 120,
   vbg_state: 10, vbg_complete: 'bool', vbg_core_count: 'int', vbg_error_code: 10,
-  company_prefix: 20, licensee_name: 200, brand_name: 120, licensee_gln: 13, licensing_mo: 80,
+  company_prefix: 20, licensee_name: 200, brand_name: 120, vbg_record_status: 30, vbg_licence_status: 30, licensee_gln: 13, licensing_mo: 80,
   gpc_brick: 10, gpc_brick_name: 200, gpc_segment: 200,
   link_domain: 253, link_level: 10, link_imitates: 253, link_threats: 'strings',
 }
@@ -151,18 +151,23 @@ async function events(request: Request, env: Env, ctx: ExecutionContext): Promis
         body: JSON.stringify(body),
       })
     ctx.waitUntil(
-      insert(row).then(async (res) => {
-        if (res.ok) return
-        const text = await res.text()
-        // Colonna aggiunta di recente non ancora creata nel database (PGRST204): si salva la scansione senza.
-        if (res.status === 400 && text.includes('PGRST204') && 'brand_name' in row) {
-          const { brand_name: _omit, ...rest } = row
-          const retry = await insert(rest)
-          if (!retry.ok) console.error('Supabase', retry.status, await retry.text())
-          return
+      (async () => {
+        // Colonne aggiunte di recente e non ancora create nel database (PGRST204): si toglie la colonna
+        // indicata nell'errore e si riprova, così la scansione viene comunque salvata.
+        let body = row
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const res = await insert(body)
+          if (res.ok) return
+          const text = await res.text()
+          const missing = res.status === 400 && text.includes('PGRST204') ? text.match(/'([a-z_]+)' column/)?.[1] : undefined
+          if (!missing || !(missing in body)) {
+            console.error('Supabase', res.status, text)
+            return
+          }
+          const { [missing]: _omit, ...rest } = body
+          body = rest
         }
-        console.error('Supabase', res.status, text)
-      }),
+      })(),
     )
   }
   return new Response(null, { status: 202, headers: cors })

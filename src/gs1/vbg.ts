@@ -16,6 +16,8 @@ export type Licensee = {
   gln?: string
   website?: string
   address?: string
+  /** Stato della licenza GS1 come lo riporta Verified by GS1 (es. ACTIVE, INACTIVE), se presente. */
+  status?: string
 }
 
 export type Verification = {
@@ -44,6 +46,8 @@ export type Verification = {
 type Lang = { language: string; value: string }
 type RawLicence = {
   licenseeName: string
+  licenceStatus?: string
+  status?: string
   licenceKey?: string
   licenseeGLN?: string
   licensingMO?: { moName: string }
@@ -160,6 +164,7 @@ function mapLicensee(licence?: RawLicence): Licensee | undefined {
     gln: licence.licenseeGLN,
     website: licence.contactPoint?.find((c) => c.website)?.website,
     address: formatAddress(licence.address),
+    status: licence.licenceStatus ?? licence.status,
   }
 }
 

@@ -47,6 +47,8 @@ create table if not exists public.scan_events (
   company_prefix    text,          -- licenza GS1 del titolare (GS1 Company Prefix)
   licensee_name     text,
   brand_name        text,          -- marchio del prodotto (da Verified by GS1)
+  vbg_record_status text,          -- stato della scheda su VbG (gtinRecordStatus/keyRecordStatus, es. OK)
+  vbg_licence_status text,         -- stato della licenza GS1, se VbG lo riporta (es. ACTIVE, INACTIVE)
   licensee_gln      text,
   licensing_mo      text,
   gpc_brick         text,
@@ -62,6 +64,8 @@ create table if not exists public.scan_events (
 
 -- Colonne aggiunte dopo la prima versione (per i database già creati).
 alter table public.scan_events add column if not exists brand_name text;
+alter table public.scan_events add column if not exists vbg_record_status text;
+alter table public.scan_events add column if not exists vbg_licence_status text;
 
 comment on table public.scan_events is
   'Una riga per scansione completata nell''app VbG Scan. Nessun dato personale: niente IP né identificativi; posizione a livello di regione dedotta da Cloudflare.';
