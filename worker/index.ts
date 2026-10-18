@@ -1,5 +1,6 @@
 /*
- * Proxy Verified by GS1 su Cloudflare Workers.
+ * API dell'app su Cloudflare Workers (l'app è su GitHub Pages).
+ * Proxy Verified by GS1:
  * Il browser chiama /api/vbg/<chiave>/ e il Worker inoltra a https://api.vbg.gs1it.org/v2/<chiave>/
  * aggiungendo il token, che resta un secret di Cloudflare (`wrangler secret put VBG_API_TOKEN`).
  */
@@ -11,11 +12,12 @@ type Env = {
   /** Statistiche: progetto Supabase e chiave segreta (facoltativi: senza, gli eventi vengono ignorati). */
   SUPABASE_URL?: string
   SUPABASE_SECRET_KEY?: string
-  ASSETS: Fetcher
   VBG_LIMITER: RateLimit
 }
 
 const UPSTREAM = 'https://api.vbg.gs1it.org/v2'
+// L'app è pubblicata solo su GitHub Pages: il Worker espone soltanto le API.
+const APP_URL = 'https://marcoruberto-gs1it.github.io/gs1-italy-vbg-app/'
 // Solo gli endpoint in lettura usati dall'app.
 const KEYS = new Set(['gtin', 'gln', 'sscc', 'grai', 'giai', 'gsrn', 'gdti', 'ginc', 'gsin', 'gcn', 'cpid', 'gmn', 'itip'])
 // L'app invia sempre un solo codice per richiesta: niente interrogazioni massive con il token.
@@ -161,7 +163,7 @@ export default {
     if (url.pathname === '/api/linkcheck') return linkCheck(request, env, ctx)
     if (url.pathname === '/api/events') return events(request, env, ctx)
     const match = url.pathname.match(/^\/api\/vbg\/([a-z]+)\/$/)
-    if (!match) return url.pathname.startsWith('/api/') ? json(request, 404, 'Not found') : env.ASSETS.fetch(request)
+    if (!match) return url.pathname.startsWith('/api/') ? json(request, 404, 'Not found') : Response.redirect(APP_URL, 301)
 
     const key = match[1]
     if (!KEYS.has(key)) return json(request, 404, 'Not found')

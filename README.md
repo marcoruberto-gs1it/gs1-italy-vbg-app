@@ -110,7 +110,7 @@ cp .env.example .env.local   # poi inserisci VBG_API_TOKEN
 
 - Il token sta in `.env.local` (escluso da git) senza prefisso `VITE_`, quindi **non finisce nel bundle** né nelle richieste del browser.
 - In sviluppo (`npm run dev`, `npm run preview`) il proxy è quello di Vite.
-- In produzione l'app gira su **Cloudflare Workers** (piano gratuito): https://gs1-vbg-scan.marco-ruberto.workers.dev
+- L'app è pubblicata solo su **GitHub Pages**: https://marcoruberto-gs1it.github.io/gs1-italy-vbg-app/ . Il Worker Cloudflare (https://gs1-vbg-scan.marco-ruberto.workers.dev) espone solo le API e reindirizza ogni altra richiesta all'app su Pages.
 
 ## Pubblicazione su GitHub Pages
 
@@ -120,15 +120,15 @@ A ogni push su `main` il workflow `.github/workflows/pages.yml` compila l'app e 
 - `VITE_VBG_BASE` punta il frontend al proxy del Cloudflare Worker, perché Pages serve solo file statici.
 - Il Worker accetta chiamate da altri domini solo da `https://marcoruberto-gs1it.github.io` (`ALLOWED_ORIGINS` in `worker/index.ts`). Se cambia il dominio, aggiornalo lì e ripubblica il Worker.
 
-## Pubblicazione su Cloudflare
+## Worker Cloudflare (API)
 
-`worker/index.ts` serve l'app (build di Vite, come file statici) e risponde solo su `/api/vbg/<chiave>/`. Aggiunge il token, che è un secret di Cloudflare, e accetta un solo codice per richiesta, solo in POST e solo sugli endpoint di lettura dell'app, con un limite di 30 richieste al minuto per IP. La configurazione è in `wrangler.jsonc`.
+`worker/index.ts` espone solo le API (`/api/vbg/<chiave>/`, `/api/linkcheck`, `/api/events`); l'app è su GitHub Pages. Aggiunge il token, che è un secret di Cloudflare, e accetta un solo codice per richiesta, solo in POST e solo sugli endpoint di lettura dell'app, con un limite di 30 richieste al minuto per IP. La configurazione è in `wrangler.jsonc`.
 
 ```sh
 npx wrangler login                        # una volta
 npx wrangler secret put VBG_API_TOKEN     # una volta, o per sostituire il token
-npm run deploy                            # build + pubblicazione
-npm run worker:dev                        # prova locale del Worker (token in .dev.vars, escluso da git)
+npm run deploy                            # pubblica il Worker (solo API)
+npm run worker:dev                        # prova locale del Worker (secret in .dev.vars, escluso da git)
 ```
 
 ## Licenze
