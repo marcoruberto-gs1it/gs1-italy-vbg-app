@@ -1,7 +1,9 @@
 /*
  * Lingua dell'interfaccia: italiano o inglese.
- * Ordine di scelta: ?lang=it|en nell'indirizzo → scelta salvata dall'utente → prima lingua del browser
- * (italiano se è italiano, altrimenti inglese).
+ * Ordine di scelta: ?lang=it|en nell'indirizzo → scelta salvata dall'utente → lingue del browser, in ordine
+ * di preferenza (la prima tra italiano e inglese; se non c'è nessuna delle due, inglese).
+ * La scelta si salva solo se diversa dalla lingua del browser: così chi non ha mai cambiato lingua, o è
+ * tornato a quella del browser, segue sempre le impostazioni del browser.
  * I testi restano in italiano nel codice e fanno da chiave: le traduzioni sono in en.json.
  */
 import { useSyncExternalStore } from 'react'
@@ -14,18 +16,32 @@ export const LANGS: { id: Lang; label: string; short: string }[] = [
   { id: 'en', label: 'English', short: 'EN' },
 ]
 
-const KEY = 'vbg-lang'
+const KEY = 'vbg-lang-choice'
+/** Chiave della prima versione: salvava anche le scelte uguali alla lingua del browser, quindi si scarta. */
+const OLD_KEY = 'vbg-lang'
 const isLang = (v: unknown): v is Lang => v === 'it' || v === 'en'
 
-/** Lingua da usare: parametro nell'indirizzo, poi scelta salvata, poi prima lingua del browser. */
+/** Lingua del browser: la prima supportata tra quelle preferite (it-IT → it, en-US → en), altrimenti inglese. */
+export function browserLang(languages: readonly string[]): Lang {
+  for (const tag of languages) {
+    const base = tag.toLowerCase().split(/[-_]/)[0]
+    if (isLang(base)) return base
+  }
+  return 'en'
+}
+
+/** Lingua da usare: parametro nell'indirizzo, poi scelta salvata, poi lingue del browser. */
 export function detectLang(param: string | null, stored: string | null, languages: readonly string[]): Lang {
   if (isLang(param)) return param
   if (isLang(stored)) return stored
-  return /^it\b/i.test(languages[0] ?? '') ? 'it' : 'en'
+  return browserLang(languages)
 }
+
+const navigatorLanguages = () => (typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : [navigator.language])
 
 function readStored() {
   try {
+    localStorage.removeItem(OLD_KEY)
     return localStorage.getItem(KEY)
   } catch {
     return null
@@ -35,7 +51,7 @@ function readStored() {
 let current: Lang =
   typeof window === 'undefined'
     ? 'it'
-    : detectLang(new URLSearchParams(window.location.search).get('lang'), readStored(), navigator.languages?.length ? navigator.languages : [navigator.language])
+    : detectLang(new URLSearchParams(window.location.search).get('lang'), readStored(), navigatorLanguages())
 const listeners = new Set<() => void>()
 if (typeof document !== 'undefined') document.documentElement.lang = current
 
@@ -44,12 +60,13 @@ export const lang = () => current
 /** Locale per numeri e date. */
 export const locale = () => (current === 'en' ? 'en-GB' : 'it-IT')
 
-/** Cambia lingua e la ricorda per le prossime visite. */
+/** Cambia lingua e la ricorda per le prossime visite (se è quella del browser, torna a seguire il browser). */
 export function setLang(next: Lang) {
   if (next === current) return
   current = next
   try {
-    localStorage.setItem(KEY, next)
+    if (next === browserLang(navigatorLanguages())) localStorage.removeItem(KEY)
+    else localStorage.setItem(KEY, next)
   } catch {
     // Archiviazione non disponibile (navigazione privata): vale solo per questa visita.
   }

@@ -23,7 +23,7 @@ import { formatName } from './scanner/formats'
 import { alreadyReloaded, loadVersion, useUpdateAvailable } from './lib/update'
 import type { Hit } from './scanner/types'
 import type { CameraError } from './scanner/useScanner'
-import { t } from './i18n'
+import { t, useLang } from './i18n'
 
 type SheetState = { type: 'manual' } | { type: 'info'; topic: InfoTopic } | { type: 'privacy' } | null
 
@@ -73,6 +73,8 @@ export default function App() {
   // Statistiche: scansioni nuove in attesa che tutti i controlli asincroni siano arrivati.
   const pendingEvents = useRef(new Map<string, ScanSource>())
   const historyRef = useRef(history)
+  // Lingua corrente: al cambio si ridisegna tutta l'interfaccia (i testi si calcolano a ogni rendering).
+  const lang = useLang()
 
   useEffect(() => {
     void loadToolkit()
@@ -134,14 +136,15 @@ export default function App() {
   )
 
   // La verifica Verified by GS1 arriva dopo l'esito: aggiorna la schermata aperta e la cronologia.
-  const verify = useCallback((target: Scan) => {
+  // refresh: richiede di nuovo i dati già arrivati (es. nella nuova lingua) senza tornare allo stato "in verifica".
+  const verify = useCallback((target: Scan, refresh = false) => {
     const primary = target.primary
-    if (!primary || !needsVerification(target)) return
+    if (!primary || !(refresh ? target.vbg && target.vbg.state !== 'error' : needsVerification(target))) return
     const apply = (vbg: Scan['vbg']) => {
       setScan((current) => (current?.id === target.id ? { ...current, vbg } : current))
       setHistory((list) => list.map((item) => (item.id === target.id ? { ...item, vbg } : item)))
     }
-    apply(undefined)
+    if (!refresh) apply(undefined)
     void verifyKey(primary.ai, primary.value).then(apply)
   }, [])
 
@@ -185,6 +188,27 @@ export default function App() {
     },
     [verify, lint, guard],
   )
+
+  // Rilegge una scansione nella lingua corrente: nomi dei campi, date, paesi, messaggi della Syntax Engine
+  // e dati Verified by GS1 (la scansione può essere stata fatta in un'altra lingua).
+  const localize = useCallback(
+    (target: Scan) => {
+      void interpretScan(target.raw, target.format).then((fresh) =>
+        setScan((current) => (current?.id === target.id ? { ...current, primary: fresh.primary, fields: fresh.fields } : current)),
+      )
+      if (target.syntax !== undefined) lint({ ...target, syntax: undefined })
+      verify(target, true)
+    },
+    [lint, verify],
+  )
+
+  // Cambio di lingua con una scansione aperta: la si rilegge subito nella nuova lingua.
+  const shownLang = useRef(lang)
+  useEffect(() => {
+    if (shownLang.current === lang) return
+    shownLang.current = lang
+    if (scan) localize(scan)
+  }, [lang, localize, scan])
 
   const onRead = useCallback(
     (hit: Hit, center: { x: number; y: number }) => {
@@ -245,10 +269,7 @@ export default function App() {
     verify(stored)
     lint(stored)
     guard(stored)
-    // Date, nomi dei campi e paesi si rileggono nella lingua corrente (la scansione può essere di una visita in un'altra lingua).
-    void interpretScan(stored.raw, stored.format).then((fresh) =>
-      setScan((current) => (current?.id === stored.id ? { ...current, primary: fresh.primary, fields: fresh.fields } : current)),
-    )
+    localize(stored)
   }
 
   // Versione più nuova pubblicata: se l'app è ferma sulla home si ricarica da sola, altrimenti lo propone.

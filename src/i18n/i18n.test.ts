@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import EN from './en.json'
-import { _setLangForTest, detectLang, t } from './index'
+import { _setLangForTest, browserLang, detectLang, t } from './index'
 
 const SRC = join(__dirname, '..')
 
@@ -42,7 +42,11 @@ describe('lingua', () => {
     expect(detectLang('en', 'it', ['it-IT'])).toBe('en')
     expect(detectLang(null, 'it', ['en-US'])).toBe('it')
     expect(detectLang(null, null, ['it-IT', 'en'])).toBe('it')
-    expect(detectLang(null, null, ['de-DE', 'it'])).toBe('en')
+    expect(detectLang(null, null, ['de-DE', 'it'])).toBe('it')
+    expect(detectLang(null, null, ['de-DE', 'fr'])).toBe('en')
+    expect(browserLang(['en-US', 'it-IT'])).toBe('en')
+    expect(browserLang(['IT_it'])).toBe('it')
+    expect(browserLang([])).toBe('en')
     expect(detectLang('xx', null, [])).toBe('en')
   })
   it('traduce e sostituisce le variabili', () => {
