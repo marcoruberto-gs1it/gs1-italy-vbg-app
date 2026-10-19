@@ -23,6 +23,7 @@ import { formatName } from './scanner/formats'
 import { alreadyReloaded, loadVersion, useUpdateAvailable } from './lib/update'
 import type { Hit } from './scanner/types'
 import type { CameraError } from './scanner/useScanner'
+import { t } from './i18n'
 
 type SheetState = { type: 'manual' } | { type: 'info'; topic: InfoTopic } | { type: 'privacy' } | null
 
@@ -232,18 +233,22 @@ export default function App() {
     if (!file) return
     const hit = await decodeImage(file)
     if (!hit) {
-      setNotice('Nessun codice trovato nella foto')
+      setNotice(t('Nessun codice trovato nella foto'))
       return
     }
     show({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) }, undefined, 'image')
   }
 
-  function openFromHistory(item: Scan) {
+  function openFromHistory(stored: Scan) {
     setOrigin({ x: window.innerWidth / 2, y: window.innerHeight })
-    setScan(item)
-    verify(item)
-    lint(item)
-    guard(item)
+    setScan(stored)
+    verify(stored)
+    lint(stored)
+    guard(stored)
+    // Date, nomi dei campi e paesi si rileggono nella lingua corrente (la scansione può essere di una visita in un'altra lingua).
+    void interpretScan(stored.raw, stored.format).then((fresh) =>
+      setScan((current) => (current?.id === stored.id ? { ...current, primary: fresh.primary, fields: fresh.fields } : current)),
+    )
   }
 
   // Versione più nuova pubblicata: se l'app è ferma sulla home si ricarica da sola, altrimenti lo propone.
@@ -269,10 +274,10 @@ export default function App() {
         ) : (
           <div className="page" ref={pageRef}>
             <div className="page-head">
-              <h1>Scansioni recenti</h1>
+              <h1>{t('Scansioni recenti')}</h1>
               {history.length > 0 && (
                 <button className="text-btn" type="button" onClick={() => setHistory([])}>
-                  <Trash2 size={16} /> Svuota
+                  <Trash2 size={16} /> {t('Svuota')}
                 </button>
               )}
             </div>
@@ -281,8 +286,8 @@ export default function App() {
             ) : (
               <div className="empty-card">
                 <IllPhone />
-                <p>Qui trovi i codici che leggi. Restano solo su questo dispositivo.</p>
-                <button className="cta" type="button" onClick={openScanner}><ScanBarcode size={20} /> Scansiona un codice</button>
+                <p>{t('Qui trovi i codici che leggi. Restano solo su questo dispositivo.')}</p>
+                <button className="cta" type="button" onClick={openScanner}><ScanBarcode size={20} /> {t('Scansiona un codice')}</button>
               </div>
             )}
           </div>
@@ -317,12 +322,12 @@ export default function App() {
       )}
 
       {sheet?.type === 'manual' && (
-        <Sheet title="Inserisci un codice" onClose={() => setSheet(null)}>
+        <Sheet title={t('Inserisci un codice')} onClose={() => setSheet(null)}>
           <ManualForm onSubmit={readManual} />
         </Sheet>
       )}
       {sheet?.type === 'privacy' && (
-        <Sheet title="Privacy e dati" tall onClose={() => setSheet(null)}>
+        <Sheet title={t('Privacy e dati')} tall onClose={() => setSheet(null)}>
           <PrivacyContent />
         </Sheet>
       )}
@@ -336,8 +341,8 @@ export default function App() {
       {notice && <div className="toast" role="status">{notice}</div>}
       {update && (!idle || alreadyReloaded(update)) && (
         <div className="update-toast" role="status">
-          <span>È disponibile una nuova versione dell’app</span>
-          <button type="button" onClick={() => loadVersion(update)}>Aggiorna</button>
+          <span>{t('È disponibile una nuova versione dell’app')}</span>
+          <button type="button" onClick={() => loadVersion(update)}>{t('Aggiorna')}</button>
         </div>
       )}
     </div>

@@ -11,6 +11,11 @@ import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
 import { codeType, formatKind, gs1Compliance, titleOf, type Scan } from './scan'
 import { Symbol2D } from './symbol'
+import { t } from '../i18n'
+import { formatLabel } from '../lib/display'
+
+/** Segna un testo da tradurre senza tradurlo subito. */
+const k = (s: string) => s
 
 type Props = {
   scan: Scan
@@ -122,14 +127,14 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
       // Sul telefono il pannello di condivisione (che permette anche di salvarlo), sul computer il download.
       const touch = window.matchMedia('(pointer: coarse)').matches
       if (touch && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Rapporto di verifica' }).catch((error: unknown) => {
+        await navigator.share({ files: [file], title: t('Rapporto di verifica') }).catch((error: unknown) => {
           if ((error as { name?: string })?.name !== 'AbortError') download()
         })
       } else {
         download()
       }
     } catch {
-      onNotice('Rapporto non disponibile')
+      onNotice(t('Rapporto non disponibile'))
     } finally {
       setReporting(false)
     }
@@ -141,31 +146,31 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
-      onNotice('Copia non disponibile')
+      onNotice(t('Copia non disponibile'))
     }
   }
 
   const details: [string, string, string?][] = [
     ...scan.fields.map((f) => [f.label, f.display, f.ai] as [string, string, string]),
-    ...(vbg?.updated ? [['Ultimo aggiornamento', vbg.updated] as [string, string]] : []),
+    ...(vbg?.updated ? [[t('Ultimo aggiornamento'), vbg.updated] as [string, string]] : []),
   ]
   const notes = Object.fromEntries(scan.fields.map((f) => [f.ai, f]))
 
   return (
-    <section className="result" ref={scope} aria-label="Esito della scansione">
+    <section className="result" ref={scope} aria-label={t('Esito della scansione')}>
       <header className="result-top">
-        <button className="icon-btn" type="button" onClick={onClose} aria-label="Chiudi e torna alla home">
+        <button className="icon-btn" type="button" onClick={onClose} aria-label={t('Chiudi e torna alla home')}>
           <X size={20} />
         </button>
         <div className="result-tools">
-          <button className="icon-btn" type="button" onClick={() => void report()} aria-label="Rapporto di verifica PDF" disabled={reporting}>
+          <button className="icon-btn" type="button" onClick={() => void report()} aria-label={t('Rapporto di verifica PDF')} disabled={reporting}>
             {reporting ? <LoaderCircle size={18} className="spin" /> : <FileText size={18} />}
           </button>
-          <button className="icon-btn" type="button" onClick={() => void copy()} aria-label="Copia il codice">
+          <button className="icon-btn" type="button" onClick={() => void copy()} aria-label={t('Copia il codice')}>
             {copied ? <Check size={18} /> : <Copy size={18} />}
           </button>
           {canShare && (
-            <button className="icon-btn" type="button" onClick={() => void navigator.share({ title: titleOf(scan), text: primary?.value ?? scan.raw, url: shareUrl }).catch(() => {})} aria-label="Condividi">
+            <button className="icon-btn" type="button" onClick={() => void navigator.share({ title: titleOf(scan), text: primary?.value ?? scan.raw, url: shareUrl }).catch(() => {})} aria-label={t('Condividi')}>
               <Share2 size={18} />
             </button>
           )}
@@ -188,12 +193,12 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           <div className="code-type">
             <span className="code-type-icon" aria-hidden="true"><FormatIcon kind={formatKind(scan.format)} /></span>
             <div className="code-type-text">
-              <small>Tipo di codice</small>
-              <strong>{type.title}</strong>
+              <small>{t('Tipo di codice')}</small>
+              <strong>{formatLabel(type.title)}</strong>
               <span className="code-type-tags">
                 {type.tag !== type.title && <span className="tag tag-strong">{type.tag}</span>}
-                {type.manual && <span className="tag">Inserito a mano</span>}
-                {type.count > 1 && <span className="tag">{type.count} dati</span>}
+                {type.manual && <span className="tag">{t('Inserito a mano')}</span>}
+                {type.count > 1 && <span className="tag">{t('{n} dati', { n: type.count })}</span>}
                 {issuer && /^GS1\b/.test(issuer) && <span className="tag">{issuer}</span>}
               </span>
             </div>
@@ -202,7 +207,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
             </div>
           </div>
 
-          {scan.symbol && <Symbol2D symbol={scan.symbol} label={type.title} />}
+          {scan.symbol && <Symbol2D symbol={scan.symbol} label={formatLabel(type.title)} />}
 
           {groups ? (
             <h1 className={`digits ${(digits?.length ?? 0) >= 18 ? 'is-xlong' : (digits?.length ?? 0) > 13 ? 'is-long' : ''}`} aria-label={digits ?? undefined}>
@@ -219,8 +224,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
           {drawBars && <Bars digits={barDigits} />}
 
           <div className="chips">
-            {scan.checkDigit === true && <span className="chip ok"><ShieldCheck size={14} /> Cifra di controllo valida</span>}
-            {scan.checkDigit === false && <span className="chip bad"><TriangleAlert size={14} /> Cifra di controllo errata</span>}
+            {scan.checkDigit === true && <span className="chip ok"><ShieldCheck size={14} /> {t('Cifra di controllo valida')}</span>}
+            {scan.checkDigit === false && <span className="chip bad"><TriangleAlert size={14} /> {t('Cifra di controllo errata')}</span>}
           </div>
         </div>
 
@@ -231,7 +236,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
         {details.length > 0 && (
           <div className="vbg-reveal">
-            <h2 className="section-label">Dettagli</h2>
+            <h2 className="section-label">{t('Dettagli')}</h2>
             <dl className="result-card fields">
               {details.map(([label, value, ai]) => {
                 const field = ai ? notes[ai] : undefined
@@ -243,13 +248,13 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
         {vbg?.licensee && (
           <div className="vbg-reveal">
-            <h2 className="section-label">Titolare del codice</h2>
+            <h2 className="section-label">{t('Titolare del codice')}</h2>
             <div className="result-card licensee">
               <strong>{vbg.licensee.name}</strong>
               {vbg.licensee.address && <p>{vbg.licensee.address}</p>}
               <dl>
-                {vbg.licensee.gln && <><dt>GLN</dt><dd className="mono">{vbg.licensee.gln}</dd></>}
-                {vbg.licensee.mo && <><dt>Licenza</dt><dd>{vbg.licensee.mo}</dd></>}
+                {vbg.licensee.gln && <><dt>{t('GLN')}</dt><dd className="mono">{vbg.licensee.gln}</dd></>}
+                {vbg.licensee.mo && <><dt>{t('Licenza')}</dt><dd>{vbg.licensee.mo}</dd></>}
               </dl>
               {vbg.licensee.website && (
                 <a href={vbg.licensee.website} target="_blank" rel="noreferrer">{hostOf(vbg.licensee.website)} <ArrowUpRight size={15} /></a>
@@ -260,7 +265,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
         {vbg && vbg.links.length > 0 && (
           <div className="vbg-reveal">
-            <h2 className="section-label">Link del produttore</h2>
+            <h2 className="section-label">{t('Link del produttore')}</h2>
             <ul className="result-card links">
               {vbg.links.map((link) => (
                 <li key={link.href}>
@@ -280,8 +285,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
         <button className="result-card report-card" type="button" onClick={() => void report()} disabled={reporting}>
           <span className="report-icon">{reporting ? <LoaderCircle size={22} className="spin" /> : <FileText size={22} />}</span>
           <span>
-            <strong>Rapporto di verifica</strong>
-            <small>PDF con l’esito di tutti i controlli</small>
+            <strong>{t('Rapporto di verifica')}</strong>
+            <small>{t('PDF con l’esito di tutti i controlli')}</small>
           </span>
           <ArrowUpRight size={20} />
         </button>
@@ -289,7 +294,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
         {!scan.url && scan.digitalLink && (
           <a className="result-card link-card" href={scan.digitalLink} target="_blank" rel="noreferrer">
             <span>
-              <strong>GS1 Digital Link</strong>
+              <strong>{t('GS1 Digital Link')}</strong>
               <small>{scan.digitalLink.replace(/^https?:\/\//, '')}</small>
             </span>
             <ArrowUpRight size={20} />
@@ -299,18 +304,19 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
       <div className="result-dock">
         <button className="cta" type="button" onClick={onRescan}>
-          <ScanBarcode size={20} /> Scansiona di nuovo
+          <ScanBarcode size={20} /> {t('Scansiona di nuovo')}
         </button>
       </div>
     </section>
   )
 }
 
+/** Esito della verifica in due parti (la seconda in evidenza), tradotte al momento dell'uso. */
 const verdicts: Record<Verification['state'], [string, string]> = {
-  verified: ['Codice', 'verificato'],
-  licensed: ['Codice', 'registrato'],
-  invalid: ['Codice', 'non verificato'],
-  error: ['Verifica', 'non disponibile'],
+  verified: [k('Codice'), k('verificato')],
+  licensed: [k('Codice'), k('registrato')],
+  invalid: [k('Codice'), k('non verificato')],
+  error: [k('Verifica'), k('non disponibile')],
 }
 
 function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: boolean; onRetry: () => void }) {
@@ -324,8 +330,8 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
             <span className="vbg-badge"><ShieldCheck size={22} /></span>
           </span>
           <div>
-            <h2>Verifica in corso</h2>
-            <p>Controllo nel registro Verified by GS1…</p>
+            <h2>{t('Verifica in corso')}</h2>
+            <p>{t('Controllo nel registro Verified by GS1…')}</p>
           </div>
         </div>
         <div className="vbg-product">
@@ -340,16 +346,16 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
     )
   }
 
-  const [lead, word] = vbg.state === 'verified' && isProduct ? ['Prodotto', 'verificato'] : verdicts[vbg.state]
+  const [lead, word] = (vbg.state === 'verified' && isProduct ? [k('Prodotto'), k('verificato')] : verdicts[vbg.state]).map((s) => t(s))
   const sub =
     vbg.state === 'verified'
-      ? 'Dati pubblicati dal titolare su Verified by GS1.'
+      ? t('Dati pubblicati dal titolare su Verified by GS1.')
       : vbg.state === 'licensed'
         ? vbg.name
-          ? 'Registrato su Verified by GS1.'
+          ? t('Registrato su Verified by GS1.')
           : isProduct
-            ? 'Il numero è assegnato a un’azienda, che non ha ancora pubblicato i dati del prodotto.'
-            : 'Il codice appartiene a un’azienda registrata presso GS1.'
+            ? t('Il numero è assegnato a un’azienda, che non ha ancora pubblicato i dati del prodotto.')
+            : t('Il codice appartiene a un’azienda registrata presso GS1.')
         : vbg.message
 
   return (
@@ -374,15 +380,15 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
 
       {(vbg.complete === false || (vbg.recordStatus && vbg.recordStatus !== 'OK')) && (
         <div className="chips left vbg-reveal">
-          {vbg.state === 'verified' && vbg.complete === false && <span className="chip warn">Dati parziali</span>}
-          {vbg.recordStatus === 'INACTIVE' && <span className="chip warn">Codice non più attivo</span>}
-          {vbg.recordStatus === 'DISCONTINUED' && <span className="chip warn">Fuori produzione</span>}
+          {vbg.state === 'verified' && vbg.complete === false && <span className="chip warn">{t('Dati parziali')}</span>}
+          {vbg.recordStatus === 'INACTIVE' && <span className="chip warn">{t('Codice non più attivo')}</span>}
+          {vbg.recordStatus === 'DISCONTINUED' && <span className="chip warn">{t('Fuori produzione')}</span>}
         </div>
       )}
 
       {vbg.state === 'error' && (
         <button className="cta cta-navy vbg-reveal" type="button" onClick={onRetry}>
-          <RotateCcw size={18} /> Riprova la verifica
+          <RotateCcw size={18} /> {t('Riprova la verifica')}
         </button>
       )}
     </div>
@@ -393,17 +399,17 @@ function VbgCard({ vbg, isProduct, onRetry }: { vbg?: Verification; isProduct: b
 function Markup({ text }: { text: string }) {
   const parts = text.split('|')
   return (
-    <code className="err-markup" aria-label={`Dato con errore: ${text.replace(/\|/g, '')}`}>
+    <code className="err-markup" aria-label={t('Dato con errore: {value}', { value: text.replace(/\|/g, '') })}>
       {parts.map((part, i) => (i % 2 === 1 ? <mark key={i}>{part}</mark> : <span key={i}>{part}</span>))}
     </code>
   )
 }
 
 const linkVerdicts: Record<LinkCheck['level'], string> = {
-  trusted: 'Link verificato',
-  unknown: 'Dominio non riconosciuto',
-  danger: 'Link sospetto',
-  pending: 'Controllo del link…',
+  trusted: k('Link verificato'),
+  unknown: k('Dominio non riconosciuto'),
+  danger: k('Link sospetto'),
+  pending: k('Controllo del link…'),
 }
 
 /**
@@ -422,11 +428,11 @@ function LinkCard({ url, webRisk, raw, manual, gs1, vbg, safeUrl }: { url: strin
 
   return (
     <div className={`result-card link-safety is-${check.level}`}>
-      <p className="link-eyebrow"><Link2 size={14} /> {manual ? 'Link inserito a mano' : gs1 ? 'Link nel QR Code Standard GS1' : 'Link nel codice'}</p>
+      <p className="link-eyebrow"><Link2 size={14} /> {manual ? t('Link inserito a mano') : gs1 ? t('Link nel QR Code Standard GS1') : t('Link nel codice')}</p>
       <div className="link-head">
         <span className="link-badge"><Icon size={22} className={check.level === 'pending' ? 'spin' : undefined} /></span>
         <div>
-          <h3>{linkVerdicts[check.level]}</h3>
+          <h3>{t(linkVerdicts[check.level])}</h3>
           <p className="link-domain">{domain}</p>
           {check.host !== domain && <p className="link-host">{check.host}</p>}
         </div>
@@ -437,14 +443,14 @@ function LinkCard({ url, webRisk, raw, manual, gs1, vbg, safeUrl }: { url: strin
       </ul>
 
       {check.level === 'trusted' ? (
-        <a className="cta cta-navy" href={url} target="_blank" rel="noreferrer">Apri il link <ArrowUpRight size={18} /></a>
+        <a className="cta cta-navy" href={url} target="_blank" rel="noreferrer">{t('Apri il link')} <ArrowUpRight size={18} /></a>
       ) : alternative ? (
         <>
-          <a className="cta cta-navy" href={alternative} target="_blank" rel="noreferrer">Apri tramite GS1 (id.gs1.org) <ArrowUpRight size={18} /></a>
-          {check.level !== 'pending' && <button className="text-link danger-link" type="button" onClick={() => setConfirm(true)}>Apri comunque il link originale</button>}
+          <a className="cta cta-navy" href={alternative} target="_blank" rel="noreferrer">{t('Apri tramite GS1 (id.gs1.org)')} <ArrowUpRight size={18} /></a>
+          {check.level !== 'pending' && <button className="text-link danger-link" type="button" onClick={() => setConfirm(true)}>{t('Apri comunque il link originale')}</button>}
         </>
       ) : (
-        check.level !== 'pending' && <button className="cta cta-navy" type="button" onClick={() => setConfirm(true)}>Apri il link…</button>
+        check.level !== 'pending' && <button className="cta cta-navy" type="button" onClick={() => setConfirm(true)}>{t('Apri il link…')}</button>
       )}
 
       {confirm && <ConfirmOpen check={check} shown={shown} domain={domain} onClose={() => setConfirm(false)} />}
@@ -506,11 +512,11 @@ function ReadUrl({ url }: { url: string }) {
   return (
     <div className="read-url">
       <div className="read-url-head">
-        <span>Indirizzo letto</span>
-        <button type="button" onClick={() => void copy()} aria-label="Copia l’indirizzo">{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+        <span>{t('Indirizzo letto')}</span>
+        <button type="button" onClick={() => void copy()} aria-label={t('Copia l’indirizzo')}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
       </div>
       <p className="read-url-text">{body}</p>
-      {differs && <p className="read-url-note">Il browser aprirebbe in realtà il dominio <b>{parsedHost}</b></p>}
+      {differs && <p className="read-url-note">{t('Il browser aprirebbe in realtà il dominio')} <b>{parsedHost}</b></p>}
     </div>
   )
 }
@@ -537,20 +543,20 @@ function ConfirmOpen({ check, shown, domain, onClose }: { check: LinkCheck; show
   return createPortal(
     <div ref={scope}>
       <div className="sheet-layer" onClick={onClose}>
-        <div className={`sheet confirm-sheet is-${check.level}`} role="alertdialog" aria-modal="true" aria-label="Conferma apertura link" onClick={(e) => e.stopPropagation()}>
+        <div className={`sheet confirm-sheet is-${check.level}`} role="alertdialog" aria-modal="true" aria-label={t('Conferma apertura link')} onClick={(e) => e.stopPropagation()}>
           <span className="grabber" aria-hidden="true" />
           <div className="sheet-body">
             <span className="link-badge big">{check.level === 'danger' ? <ShieldAlert size={28} /> : <TriangleAlert size={28} />}</span>
-            <h2>{check.level === 'danger' ? 'Questo link sembra pericoloso' : 'Stai per aprire un sito non verificato'}</h2>
-            <p className="confirm-lead">Il link porta a:</p>
+            <h2>{check.level === 'danger' ? t('Questo link sembra pericoloso') : t('Stai per aprire un sito non verificato')}</h2>
+            <p className="confirm-lead">{t('Il link porta a:')}</p>
             <p className="link-domain big">{domain}</p>
             <ReadUrl url={shown} />
             <ul className="link-reasons">
               {check.reasons.map((reason) => <li key={reason}>{reason}</li>)}
             </ul>
-            <p className="confirm-tip">Non inserire password, dati personali o di pagamento se non sei sicuro del sito.</p>
-            <button className="cta cta-navy" type="button" onClick={onClose}>Non aprire</button>
-            <a className="text-link danger-link" href={check.url} target="_blank" rel="noreferrer noopener" onClick={onClose}>Apri {domain} <ArrowUpRight size={16} /></a>
+            <p className="confirm-tip">{t('Non inserire password, dati personali o di pagamento se non sei sicuro del sito.')}</p>
+            <button className="cta cta-navy" type="button" onClick={onClose}>{t('Non aprire')}</button>
+            <a className="text-link danger-link" href={check.url} target="_blank" rel="noreferrer noopener" onClick={onClose}>{t('Apri {domain}', { domain })} <ArrowUpRight size={16} /></a>
           </div>
         </div>
       </div>
@@ -568,7 +574,7 @@ function ProductHero({ vbg }: { vbg: Verification }) {
   return (
     <div className="product-hero vbg-reveal">
       {showImage ? (
-        <button className="product-photo" type="button" onClick={() => setZoom(true)} aria-label="Ingrandisci l’immagine del prodotto">
+        <button className="product-photo" type="button" onClick={() => setZoom(true)} aria-label={t('Ingrandisci l’immagine del prodotto')}>
           <img src={vbg.image} alt={vbg.name ?? ''} referrerPolicy="no-referrer" onError={() => setBroken(true)} />
           <span className="zoom-hint" aria-hidden="true"><Maximize2 size={16} /></span>
         </button>
@@ -606,9 +612,9 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
   // Portal su body: gli antenati animati da GSAP hanno un transform che confinerebbe il position: fixed.
   return createPortal(
     <div ref={scope}>
-      <div className="lightbox" role="dialog" aria-modal="true" aria-label="Immagine del prodotto" onClick={onClose}>
+      <div className="lightbox" role="dialog" aria-modal="true" aria-label={t('Immagine del prodotto')} onClick={onClose}>
         <img src={src} alt={alt} referrerPolicy="no-referrer" />
-        <button className="icon-btn" type="button" onClick={onClose} aria-label="Chiudi l’immagine">
+        <button className="icon-btn" type="button" onClick={onClose} aria-label={t('Chiudi l’immagine')}>
           <X size={20} />
         </button>
       </div>
@@ -621,20 +627,20 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
 function CoreAttributes({ vbg }: { vbg: Verification }) {
   const gtin = vbg.gtin?.replace(/^0(?=\d{13}$)/, '')
   const rows: { label: string; value?: string; sub?: string }[] = [
-    { label: 'GTIN', value: gtin },
-    { label: 'Marca', value: vbg.brand },
-    { label: 'Descrizione', value: vbg.name },
-    { label: 'Immagine', value: vbg.image ? 'Disponibile' : undefined },
-    { label: 'Categoria', value: vbg.categoryName ?? (vbg.category ? `GPC ${vbg.category}` : undefined), sub: vbg.categoryName ? `${vbg.categorySegment ? `${vbg.categorySegment} · ` : ''}GPC ${vbg.category}` : undefined },
-    { label: 'Contenuto netto', value: vbg.netContent },
-    { label: 'Paese di vendita', value: vbg.countries },
+    { label: t('GTIN'), value: gtin },
+    { label: t('Marca'), value: vbg.brand },
+    { label: t('Descrizione'), value: vbg.name },
+    { label: t('Immagine'), value: vbg.image ? t('Disponibile') : undefined },
+    { label: t('Categoria'), value: vbg.categoryName ?? (vbg.category ? `GPC ${vbg.category}` : undefined), sub: vbg.categoryName ? `${vbg.categorySegment ? `${vbg.categorySegment} · ` : ''}GPC ${vbg.category}` : undefined },
+    { label: t('Contenuto netto'), value: vbg.netContent },
+    { label: t('Paese di vendita'), value: vbg.countries },
   ]
   const count = rows.filter((r) => r.value).length
 
   return (
     <div className="core vbg-reveal">
       <div className="core-head">
-        <h3>I 7 dati essenziali</h3>
+        <h3>{t('I 7 dati essenziali')}</h3>
         <span className={`core-count ${count === 7 ? 'is-full' : ''}`}>{count}/7</span>
       </div>
       <ul>
@@ -643,7 +649,7 @@ function CoreAttributes({ vbg }: { vbg: Verification }) {
             <i className="core-icon" aria-hidden="true">{row.value ? <Check size={13} strokeWidth={3} /> : <Minus size={13} strokeWidth={3} />}</i>
             <span className="core-label">{row.label}</span>
             <span className="core-value">
-              {row.value ?? 'Non pubblicato'}
+              {row.value ?? t('Non pubblicato')}
               {row.sub && <small>{row.sub}</small>}
             </span>
           </li>

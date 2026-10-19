@@ -3,6 +3,7 @@ import { canVerify, type Verification } from '../gs1/vbg'
 import type { SyntaxCheck } from '../gs1/syntax'
 import type { WebRiskResult } from '../gs1/webRisk'
 import type { StoredSymbol } from './symbolData'
+import { t } from '../i18n'
 
 /** `vbg` assente = verifica non ancora arrivata (o non richiesta, vedi needsVerification). */
 export type Scan = ScanResult & { vbg?: Verification; symbol?: StoredSymbol; syntax?: SyntaxCheck | null; webRisk?: WebRiskResult }
@@ -27,23 +28,26 @@ export function formatKind(format: string) {
   return 'ean' as const
 }
 
-/** Che cosa identifica la chiave primaria, in parole semplici. */
+/** Segna un testo da tradurre senza tradurlo subito. */
+const k = (s: string) => s
+
+/** Che cosa identifica la chiave primaria, in parole semplici (tradotto in codeType). */
 const keyKinds: Record<string, [string, string]> = {
-  '01': ['Prodotto', 'GTIN'],
-  '00': ['Unità logistica', 'SSCC'],
-  '414': ['Località', 'GLN'],
-  '417': ['Azienda', 'GLN'],
-  '8003': ['Asset riutilizzabile', 'GRAI'],
-  '8004': ['Asset individuale', 'GIAI'],
-  '8017': ['Fornitore di servizi', 'GSRN'],
-  '8018': ['Destinatario di servizi', 'GSRN'],
-  '253': ['Documento', 'GDTI'],
-  '401': ['Spedizione', 'GINC'],
-  '402': ['Spedizione', 'GSIN'],
-  '255': ['Coupon', 'GCN'],
-  '8010': ['Componente', 'CPID'],
-  '8013': ['Modello di prodotto', 'GMN'],
-  '8006': ['Parte di prodotto', 'ITIP'],
+  '01': [k('Prodotto'), 'GTIN'],
+  '00': [k('Unità logistica'), 'SSCC'],
+  '414': [k('Località'), 'GLN'],
+  '417': [k('Azienda'), 'GLN'],
+  '8003': [k('Asset riutilizzabile'), 'GRAI'],
+  '8004': [k('Asset individuale'), 'GIAI'],
+  '8017': [k('Fornitore di servizi'), 'GSRN'],
+  '8018': [k('Destinatario di servizi'), 'GSRN'],
+  '253': [k('Documento'), 'GDTI'],
+  '401': [k('Spedizione'), 'GINC'],
+  '402': [k('Spedizione'), 'GSIN'],
+  '255': [k('Coupon'), 'GCN'],
+  '8010': [k('Componente'), 'CPID'],
+  '8013': [k('Modello di prodotto'), 'GMN'],
+  '8006': [k('Parte di prodotto'), 'ITIP'],
 }
 
 export type CodeType = { title: string; tag: string; manual: boolean; count: number }
@@ -59,12 +63,14 @@ export function codeType(scan: Scan): CodeType {
   let subject: string
   let key: string | undefined
   if (primary) {
-    ;[subject, key] = keyKinds[primary.ai] ?? [primary.label, undefined]
+    const kind = keyKinds[primary.ai]
+    ;[subject, key] = kind ? [t(kind[0]), kind[1]] : [primary.label, undefined]
     // GTIN-14 con indicatore diverso da 0: imballo che contiene più unità.
-    if (primary.ai === '01' && primary.value.length === 14 && !primary.value.startsWith('0')) [subject, key] = ['Imballo', 'GTIN-14']
+    if (primary.ai === '01' && primary.value.length === 14 && !primary.value.startsWith('0')) [subject, key] = [t('Imballo'), 'GTIN-14']
   } else {
-    subject = scan.kind === 'gs1' ? 'Dati GS1' : scan.kind === 'url' ? 'Link' : 'Testo'
+    subject = scan.kind === 'gs1' ? t('Dati GS1') : scan.kind === 'url' ? t('Link') : t('Testo')
   }
+  // title resta il nome interno della simbologia (finisce nelle statistiche): per mostrarlo usare formatLabel().
   return {
     title: manual ? (key ?? subject) : scan.format,
     tag: manual ? subject : key ? `${subject} · ${key}` : subject,
@@ -107,20 +113,20 @@ const GS1_SYMBOLOGIES = /^(EAN-13|EAN-8|UPC-A|UPC-E|ITF-14|GS1-128|GS1 DataBar.*
 /** Il codice letto fa parte degli standard GS1? Valuta simbologia, contenuto e cifra di controllo. */
 export function gs1Compliance(scan: Scan): Compliance {
   const notGs1 = scan.kind === 'url'
-    ? 'Contiene un link qualsiasi: non identifica nulla nel sistema GS1.'
-    : 'Il contenuto non identifica nulla nel sistema GS1.'
-  const badCheck = { level: 'error' as const, title: 'Codice GS1 con errori', detail: 'La cifra di controllo non è corretta: il codice potrebbe essere stampato o letto male.' }
+    ? t('Contiene un link qualsiasi: non identifica nulla nel sistema GS1.')
+    : t('Il contenuto non identifica nulla nel sistema GS1.')
+  const badCheck = { level: 'error' as const, title: t('Codice GS1 con errori'), detail: t('La cifra di controllo non è corretta: il codice potrebbe essere stampato o letto male.') }
   // Errore trovato dalla GS1 Barcode Syntax Engine (regole del GS1 Barcode Syntax Dictionary).
   const syntaxError = scan.syntax && !scan.syntax.ok
-    ? { level: 'error' as const, title: 'Codice GS1 con errori', detail: scan.syntax.message ?? 'I dati non rispettano le regole GS1.', markup: scan.syntax.markup }
+    ? { level: 'error' as const, title: t('Codice GS1 con errori'), detail: scan.syntax.message ?? t('I dati non rispettano le regole GS1.'), markup: scan.syntax.markup }
     : null
-  const verified = scan.syntax?.ok ? ' Controllato con la GS1 Barcode Syntax Engine.' : ''
+  const verified = scan.syntax?.ok ? ` ${t('Controllato con la GS1 Barcode Syntax Engine.')}` : ''
 
   if (scan.format === 'Manuale') {
-    if (scan.kind !== 'gs1') return { level: 'none', title: 'Non è un codice GS1', detail: notGs1 }
+    if (scan.kind !== 'gs1') return { level: 'none', title: t('Non è un codice GS1'), detail: notGs1 }
     if (syntaxError) return syntaxError
     if (scan.checkDigit === false) return badCheck
-    return { level: 'manual', title: 'Dati in formato GS1', detail: `Inserito a mano: non c’è un simbolo stampato da verificare.${verified}` }
+    return { level: 'manual', title: t('Dati in formato GS1'), detail: `${t('Inserito a mano: non c’è un simbolo stampato da verificare.')}${verified}` }
   }
 
   const gs1Symbol =
@@ -132,10 +138,10 @@ export function gs1Compliance(scan: Scan): Compliance {
   if (gs1Symbol && scan.kind === 'gs1') {
     if (syntaxError) return syntaxError
     if (scan.checkDigit === false) return badCheck
-    return { level: 'gs1', title: 'Codice Standard GS1', detail: `Simbologia e dati conformi agli standard GS1.${verified}` }
+    return { level: 'gs1', title: t('Codice Standard GS1'), detail: `${t('Simbologia e dati conformi agli standard GS1.')}${verified}` }
   }
   if (scan.kind === 'gs1') {
-    return { level: 'partial', title: 'Dati GS1 in un codice non standard', detail: 'I dati seguono il formato GS1, ma il simbolo non è codificato secondo gli standard GS1.' }
+    return { level: 'partial', title: t('Dati GS1 in un codice non standard'), detail: t('I dati seguono il formato GS1, ma il simbolo non è codificato secondo gli standard GS1.') }
   }
-  return { level: 'none', title: 'Non è un codice GS1', detail: notGs1 }
+  return { level: 'none', title: t('Non è un codice GS1'), detail: notGs1 }
 }

@@ -2,14 +2,19 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { CameraOff, Flashlight, FlashlightOff, ImageUp, Keyboard, RotateCcw, X } from 'lucide-react'
 import type { Hit, Quad } from '../scanner/types'
 import { useScanner, type CameraError } from '../scanner/useScanner'
+import { t } from '../i18n'
 
+/** Segna un testo da tradurre senza tradurlo subito. */
+const k = (s: string) => s
+
+/** Titolo e spiegazione per ogni problema della fotocamera (tradotti al momento dell'uso). */
 const cameraMessages: Record<CameraError, [string, string]> = {
-  denied: ['Accesso alla fotocamera negato', 'Consentilo nelle impostazioni del browser, poi riprova.'],
-  insecure: ['Serve una connessione sicura', 'Apri l’app da un indirizzo https:// o da localhost.'],
-  notfound: ['Nessuna fotocamera trovata', 'Collega una fotocamera o inserisci il codice a mano.'],
-  busy: ['Fotocamera occupata', 'Chiudi le altre app che la stanno usando, poi riprova.'],
-  unsupported: ['Browser non compatibile', 'Aggiorna il browser o inserisci il codice a mano.'],
-  unknown: ['Fotocamera non avviata', 'Riprova, oppure inserisci il codice a mano.'],
+  denied: [k('Accesso alla fotocamera negato'), k('Consentilo nelle impostazioni del browser, poi riprova.')],
+  insecure: [k('Serve una connessione sicura'), k('Apri l’app da un indirizzo https:// o da localhost.')],
+  notfound: [k('Nessuna fotocamera trovata'), k('Collega una fotocamera o inserisci il codice a mano.')],
+  busy: [k('Fotocamera occupata'), k('Chiudi le altre app che la stanno usando, poi riprova.')],
+  unsupported: [k('Browser non compatibile'), k('Aggiorna il browser o inserisci il codice a mano.')],
+  unknown: [k('Fotocamera non avviata'), k('Riprova, oppure inserisci il codice a mano.')],
 }
 
 type Props = {
@@ -65,7 +70,7 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue }:
   const errorText = camera.error ? cameraMessages[camera.error] : null
 
   return (
-    <section className={`scanner ${camera.mirrored ? 'is-mirrored' : ''}`} aria-label="Scanner">
+    <section className={`scanner ${camera.mirrored ? 'is-mirrored' : ''}`} aria-label={t('Scanner')}>
       <video ref={videoRef} className="scanner-video" autoPlay muted playsInline />
 
       {camera.status !== 'error' && (
@@ -80,41 +85,41 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue }:
       {lock && <div className="flash" aria-hidden="true" />}
 
       <header className="scanner-top">
-        <button className="glass" type="button" onClick={onClose} aria-label="Chiudi lo scanner">
+        <button className="glass" type="button" onClick={onClose} aria-label={t('Chiudi lo scanner')}>
           <X size={22} />
         </button>
       </header>
 
-      {camera.status === 'starting' && <div className="pill">Avvio fotocamera…</div>}
+      {camera.status === 'starting' && <div className="pill">{t('Avvio fotocamera…')}</div>}
 
       {errorText && (
         <div className="camera-error" role="alert">
           <CameraOff size={28} strokeWidth={1.6} />
-          <h1>{errorText[0]}</h1>
-          <p>{errorText[1]}</p>
+          <h1>{t(errorText[0])}</h1>
+          <p>{t(errorText[1])}</p>
           <div className="row">
             <button className="btn btn-light" type="button" onClick={() => void camera.retry()}>
-              <RotateCcw size={17} /> Riprova
+              <RotateCcw size={17} /> {t('Riprova')}
             </button>
             <button className="btn btn-ghost" type="button" onClick={onManual}>
-              <Keyboard size={17} /> Inserisci
+              <Keyboard size={17} /> {t('Inserisci')}
             </button>
           </div>
         </div>
       )}
 
-      <nav className="scanner-dock" aria-label="Strumenti">
-        <button className="glass" type="button" onClick={onImage} aria-label="Leggi da una foto">
+      <nav className="scanner-dock" aria-label={t('Strumenti')}>
+        <button className="glass" type="button" onClick={onImage} aria-label={t('Leggi da una foto')}>
           <ImageUp size={21} />
         </button>
         {camera.torch.available ? (
-          <button className={`glass glass-lg ${camera.torch.on ? 'is-on' : ''}`} type="button" onClick={() => void camera.toggleTorch()} aria-label={camera.torch.on ? 'Spegni la torcia' : 'Accendi la torcia'} aria-pressed={camera.torch.on}>
+          <button className={`glass glass-lg ${camera.torch.on ? 'is-on' : ''}`} type="button" onClick={() => void camera.toggleTorch()} aria-label={camera.torch.on ? t('Spegni la torcia') : t('Accendi la torcia')} aria-pressed={camera.torch.on}>
             {camera.torch.on ? <Flashlight size={24} /> : <FlashlightOff size={24} />}
           </button>
         ) : (
           <span className="dock-spacer" />
         )}
-        <button className="glass" type="button" onClick={onManual} aria-label="Inserisci un codice">
+        <button className="glass" type="button" onClick={onManual} aria-label={t('Inserisci un codice')}>
           <Keyboard size={21} />
         </button>
       </nav>

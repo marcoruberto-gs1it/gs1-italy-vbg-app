@@ -1,10 +1,12 @@
 import { useRef } from 'react'
 import { AppVersion } from './AppVersion'
+import { LangSwitch } from './LangSwitch'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ArrowUpRight, History, House, ImageUp, Info, Keyboard, Layers, Lock, Menu, ScanBarcode, ShieldCheck, X } from 'lucide-react'
 import logo from '../assets/gs1-italy-logo.png'
 import { GS1_IT, legalLinks, serviceLinks, socialLinks } from '../lib/links'
+import { t } from '../i18n'
 
 const YEAR = new Date().getFullYear()
 
@@ -14,17 +16,20 @@ export type InfoTopic = 'codes' | 'how' | 'vbg'
 export function Header({ raised, onMenu, onLogo }: { raised: boolean; onMenu: () => void; onLogo: () => void }) {
   return (
     <header className={`header ${raised ? 'is-raised' : ''}`}>
-      <button className="logo-btn" type="button" onClick={onLogo} aria-label="GS1 Italy, torna alla home">
-        <img src={logo} alt="GS1 Italy" width={56} height={38} />
+      <button className="logo-btn" type="button" onClick={onLogo} aria-label={t('GS1 Italy, torna alla home')}>
+        <img src={logo} alt={t('GS1 Italy')} width={56} height={38} />
         <span className="app-name">
           Verified
           <br />
           by GS1
         </span>
       </button>
-      <button className="icon-btn" type="button" onClick={onMenu} aria-label="Apri il menu">
-        <Menu size={22} />
-      </button>
+      <div className="header-actions">
+        <LangSwitch compact />
+        <button className="icon-btn" type="button" onClick={onMenu} aria-label={t('Apri il menu')}>
+          <Menu size={22} />
+        </button>
+      </div>
     </header>
   )
 }
@@ -57,26 +62,29 @@ export function Drawer({ onClose, onPrivacy, onScan, onManual, onImage, onTab, o
 
   return (
     <div className="drawer-layer" ref={scope} onClick={onClose}>
-      <nav className="drawer" aria-label="Menu" onClick={(e) => e.stopPropagation()}>
+      <nav className="drawer" aria-label={t('Menu')} onClick={(e) => e.stopPropagation()}>
         <div className="drawer-head">
-          <img src={logo} alt="GS1 Italy" width={56} height={38} />
-          <button className="icon-btn" type="button" onClick={onClose} aria-label="Chiudi il menu">
+          <img src={logo} alt={t('GS1 Italy')} width={56} height={38} />
+          <button className="icon-btn" type="button" onClick={onClose} aria-label={t('Chiudi il menu')}>
             <X size={20} />
           </button>
         </div>
 
-        <p className="drawer-label">App</p>
-        <button className="drawer-item" type="button" onClick={run(() => onTab('home'))}><House size={20} /> Home</button>
-        <button className="drawer-item" type="button" onClick={run(onScan)}><ScanBarcode size={20} /> Scansiona</button>
-        <button className="drawer-item" type="button" onClick={run(onManual)}><Keyboard size={20} /> Inserisci un codice</button>
-        <button className="drawer-item" type="button" onClick={run(onImage)}><ImageUp size={20} /> Leggi da una foto</button>
-        <button className="drawer-item" type="button" onClick={run(() => onTab('history'))}><History size={20} /> Scansioni recenti</button>
+        <p className="drawer-label">{t('App')}</p>
+        <button className="drawer-item" type="button" onClick={run(() => onTab('home'))}><House size={20} /> {t('Home')}</button>
+        <button className="drawer-item" type="button" onClick={run(onScan)}><ScanBarcode size={20} /> {t('Scansiona')}</button>
+        <button className="drawer-item" type="button" onClick={run(onManual)}><Keyboard size={20} /> {t('Inserisci un codice')}</button>
+        <button className="drawer-item" type="button" onClick={run(onImage)}><ImageUp size={20} /> {t('Leggi da una foto')}</button>
+        <button className="drawer-item" type="button" onClick={run(() => onTab('history'))}><History size={20} /> {t('Scansioni recenti')}</button>
 
-        <p className="drawer-label">Informazioni</p>
-        <button className="drawer-item" type="button" onClick={run(() => onInfo('codes'))}><Layers size={20} /> Cosa puoi leggere</button>
-        <button className="drawer-item" type="button" onClick={run(() => onInfo('how'))}><Info size={20} /> Come funziona</button>
+        <p className="drawer-label">{t('Informazioni')}</p>
+        <button className="drawer-item" type="button" onClick={run(() => onInfo('codes'))}><Layers size={20} /> {t('Cosa puoi leggere')}</button>
+        <button className="drawer-item" type="button" onClick={run(() => onInfo('how'))}><Info size={20} /> {t('Come funziona')}</button>
         <button className="drawer-item" type="button" onClick={run(() => onInfo('vbg'))}><ShieldCheck size={20} /> Verified by GS1</button>
-        <button className="drawer-item" type="button" onClick={run(onPrivacy)}><Lock size={20} /> Privacy e dati</button>
+
+        <p className="drawer-label">{t('Lingua')}</p>
+        <div className="drawer-lang"><LangSwitch /></div>
+        <button className="drawer-item" type="button" onClick={run(onPrivacy)}><Lock size={20} /> {t('Privacy e dati')}</button>
 
         <p className="drawer-label">GS1 Italy</p>
         <a className="drawer-item ext" href={GS1_IT} target="_blank" rel="noreferrer">gs1it.org <ArrowUpRight size={16} /></a>
@@ -92,21 +100,21 @@ export function Drawer({ onClose, onPrivacy, onScan, onManual, onImage, onTab, o
 
 export function TabBar({ tab, onTab, onScan, badge }: { tab: Tab; onTab: (tab: Tab) => void; onScan: () => void; badge: number }) {
   return (
-    <nav className="tabbar" aria-label="Sezioni">
+    <nav className="tabbar" aria-label={t('Sezioni')}>
       <button className={`tab ${tab === 'home' ? 'is-active' : ''}`} type="button" onClick={() => onTab('home')} aria-current={tab === 'home' ? 'page' : undefined}>
         <House size={23} />
-        <span>Home</span>
+        <span>{t('Home')}</span>
       </button>
       <button className="tab tab-scan" type="button" onClick={onScan}>
         <span className="fab"><ScanBarcode size={28} /></span>
-        <span>Scansiona</span>
+        <span>{t('Scansiona')}</span>
       </button>
       <button className={`tab ${tab === 'history' ? 'is-active' : ''}`} type="button" onClick={() => onTab('history')} aria-current={tab === 'history' ? 'page' : undefined}>
         <span className="tab-icon">
           <History size={23} />
           {badge > 0 && <i className="tab-badge">{badge > 9 ? '9+' : badge}</i>}
         </span>
-        <span>Recenti</span>
+        <span>{t('Recenti')}</span>
       </button>
     </nav>
   )
@@ -115,12 +123,12 @@ export function TabBar({ tab, onTab, onScan, badge }: { tab: Tab; onTab: (tab: T
 export function Footer({ onPrivacy }: { onPrivacy: () => void }) {
   return (
     <footer className="footer">
-      <img className="footer-logo" src={logo} alt="GS1 Italy" width={70} height={48} />
-      <p className="footer-claim">The Global Language of Business</p>
+      <img className="footer-logo" src={logo} alt={t('GS1 Italy')} width={70} height={48} />
+      <p className="footer-claim">{t('The Global Language of Business')}</p>
 
       <div className="footer-cols">
         <div>
-          <h3>Servizi</h3>
+          <h3>{t('Servizi')}</h3>
           <ul>
             {serviceLinks.map((link) => (
               <li key={link.href}><a href={link.href} target="_blank" rel="noreferrer">{link.label}</a></li>
@@ -128,9 +136,9 @@ export function Footer({ onPrivacy }: { onPrivacy: () => void }) {
           </ul>
         </div>
         <div>
-          <h3>Note legali</h3>
+          <h3>{t('Note legali')}</h3>
           <ul>
-            <li><button className="footer-privacy" type="button" onClick={onPrivacy}>Privacy e dati dell’app</button></li>
+            <li><button className="footer-privacy" type="button" onClick={onPrivacy}>{t('Privacy e dati dell’app')}</button></li>
             {legalLinks.map((link) => (
               <li key={link.href}><a href={link.href} target="_blank" rel="noreferrer">{link.label}</a></li>
             ))}
@@ -145,13 +153,13 @@ export function Footer({ onPrivacy }: { onPrivacy: () => void }) {
       </div>
 
       <address className="footer-address">
-        GS1 Italy · Via Paleocapa 7, 20121 Milano
+        GS1 Italy · Via Paleocapa 7, 20121 {t('Milano')}
         <br />
-        Codice fiscale 80140330152
+        {t('Codice fiscale')} 80140330152
       </address>
       <p className="footer-copy">© {YEAR} GS1 Italy</p>
       <a className="footer-site" href={GS1_IT} target="_blank" rel="noreferrer">
-        Vai al sito di GS1 Italy <ArrowUpRight size={17} />
+        {t('Vai al sito di GS1 Italy')} <ArrowUpRight size={17} />
       </a>
     </footer>
   )

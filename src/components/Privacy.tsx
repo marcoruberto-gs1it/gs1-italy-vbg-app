@@ -2,13 +2,16 @@ import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { Camera, ChartColumn, Cloud, HardDrive, Lock, ShieldCheck, UserX } from 'lucide-react'
+import { lang } from '../i18n'
 
 /*
  * Informativa sul trattamento dei dati dell'app (artt. 13 e 14 del Regolamento UE 2016/679).
  * Descrive ciò che il codice fa realmente: se cambia un flusso di dati, va aggiornata anche questa pagina.
  * Titolare e contatti sono quelli dell'informativa di gs1it.org (aggiornata al 15/07/2026).
+ * Il testo inglese è una traduzione di cortesia: fa fede quello italiano. Vanno aggiornati insieme.
  */
 export const PRIVACY_UPDATED = '17 ottobre 2026'
+const PRIVACY_UPDATED_EN = '17 October 2026'
 
 const summary = [
   { icon: Camera, text: 'Le immagini della fotocamera restano sul tuo dispositivo: non vengono mai inviate.' },
@@ -19,6 +22,7 @@ const summary = [
 
 export function PrivacyContent() {
   const scope = useRef<HTMLDivElement>(null)
+  const english = lang() === 'en'
   useGSAP(
     () => {
       const mm = gsap.matchMedia()
@@ -29,6 +33,8 @@ export function PrivacyContent() {
     },
     { scope },
   )
+
+  if (english) return <div className="legal" ref={scope}><PrivacyEnglish /></div>
 
   return (
     <div className="legal" ref={scope}>
@@ -108,7 +114,7 @@ export function PrivacyContent() {
 
         <h4><HardDrive size={16} /> Dati salvati sul tuo dispositivo</h4>
         <p>
-          L’app salva nella memoria del browser le tue scansioni recenti e la fotocamera preferita, solo per offrirti queste funzioni: non
+          L’app salva nella memoria del browser le tue scansioni recenti, la fotocamera preferita e la lingua scelta, solo per offrirti queste funzioni: non
           vengono inviate e non servono a tracciarti. Puoi cancellarle con il pulsante “Svuota” nella sezione Recenti o dalle impostazioni
           del browser. Non usiamo cookie di profilazione o pubblicitari.
         </p>
@@ -153,5 +159,139 @@ export function PrivacyContent() {
         <a href="https://gs1it.org/privacy-policy/" target="_blank" rel="noreferrer">informativa privacy di gs1it.org</a>.
       </p>
     </div>
+  )
+}
+
+const summaryEn = [
+  { icon: Camera, text: 'Camera images stay on your device: they are never sent.' },
+  { icon: UserX, text: 'No sign-up is needed and we do not ask for your location.' },
+  { icon: ChartColumn, text: 'For statistical purposes we record the outcome of scans, without IP address or identifiers.' },
+  { icon: Lock, text: 'No profiling or advertising cookies.' },
+]
+
+/** Translation of the Italian notice above, for convenience. The Italian text prevails. */
+function PrivacyEnglish() {
+  return (
+    <>
+      <p className="ig-lead">
+        Information on the processing of personal data under Articles 13 and 14 of Regulation (EU) 2016/679 (GDPR), relating to the GS1
+        code verification app. Last updated: {PRIVACY_UPDATED_EN}. This is a courtesy translation: in case of doubt, the Italian version prevails.
+      </p>
+
+      <ul className="privacy-summary">
+        {summaryEn.map(({ icon: Icon, text }) => (
+          <li key={text}><Icon size={20} /> <span>{text}</span></li>
+        ))}
+      </ul>
+
+      <section>
+        <h3>1. Data controller</h3>
+        <p>
+          <strong>GS1 Italy</strong>, Via P. Paleocapa 7, 20121 Milan (MI), Italy, tax code 80140330152.
+          <br />
+          Data Protection Officer (DPO): <a href="mailto:DPO@gs1it.org">DPO@gs1it.org</a>.
+          <br />
+          For any request about your data: <a href="mailto:privacy@gs1it.org">privacy@gs1it.org</a>.
+        </p>
+      </section>
+
+      <section>
+        <h3>2. What data we process and why</h3>
+
+        <h4><Camera size={16} /> Camera images and photos</h4>
+        <p>
+          Barcodes and 2D codes are read entirely on your device. Camera images and the photos you choose are neither stored nor
+          transmitted. The camera only turns on when you open the scanner, and the permission request is handled by the browser.
+        </p>
+
+        <h4><ShieldCheck size={16} /> Code verification</h4>
+        <p>
+          To show you who a code belongs to, the number read (for example the GTIN) is sent to GS1 Italy’s <strong>Verified by GS1</strong>{' '}
+          registry. If the code contains a link, its domain is compared with the sites registered by the code owner and the address may be
+          checked against <strong>Google Web Risk</strong>’s lists of dangerous sites. The number read and the link address do not identify you.
+          <br />
+          <em>Legal basis:</em> performance of the service you request (Art. 6(1)(b) GDPR).
+        </p>
+
+        <h4><ChartColumn size={16} /> Scan statistics</h4>
+        <p>For each scan we record an event with:</p>
+        <ul className="legal-list">
+          <li>date and time, country, region and approximate city;</li>
+          <li>device type (phone or computer) and reading mode (camera, photo, manual entry);</li>
+          <li>code type, result of the GS1 compliance checks and the code read (GTIN or other GS1 key);</li>
+          <li>result of the Verified by GS1 check: code owner, product category, completeness of the record;</li>
+          <li>only the <strong>domain</strong> of any link (not the full address) and the result of the safety check.</li>
+        </ul>
+        <p>
+          Country, region and city are inferred by Cloudflare from the IP address of the connection, without asking for your location and
+          without GPS: the city is approximate (on mobile networks it is often the operator’s). <strong>The IP address is not stored</strong>{' '}
+          and the event contains no identifier of the device or the person: it cannot be traced back to you.
+        </p>
+        <p>
+          <em>Purpose:</em> studies and statistics on the spread and quality of GS1 codes (for example the adoption of 2D codes by category
+          and region), on the completeness of data in Verified by GS1, and to detect misuse of codes to protect brands. The data is only
+          published in aggregate form.
+          <br />
+          <em>Legal basis:</em> GS1 Italy’s legitimate interest in promoting and checking the correct adoption of GS1 standards
+          (Art. 6(1)(f) GDPR). You can object at any time by writing to privacy@gs1it.org.
+          <br />
+          <em>Retention:</em> individual events are deleted after 24 months; only aggregate data remains.
+        </p>
+
+        <h4><Cloud size={16} /> Technical browsing data</h4>
+        <p>
+          As with any website, the providers hosting the app process the IP address and technical connection data to deliver the pages and
+          protect them from abuse. Fonts are loaded from <strong>Google Fonts</strong> and product images from the servers chosen by the code
+          owners: these also receive the device’s IP address.
+        </p>
+
+        <h4><HardDrive size={16} /> Data stored on your device</h4>
+        <p>
+          The app stores your recent scans, your preferred camera and your language in the browser’s storage, only to offer these features:
+          they are not sent and are not used to track you. You can delete them with the “Clear” button in the Recent section or from the
+          browser settings. We do not use profiling or advertising cookies.
+        </p>
+      </section>
+
+      <section>
+        <h3>3. Providers and transfers</h3>
+        <p>The data is processed, on behalf of GS1 Italy or as independent controllers for their own services, by:</p>
+        <ul className="legal-list">
+          <li><strong>Cloudflare, Inc.</strong>: app delivery, connection to the verification services, inference of the approximate location;</li>
+          <li><strong>Supabase, Inc.</strong>: statistics storage, on servers in the European Union (Frankfurt);</li>
+          <li><strong>GitHub, Inc.</strong>: app publishing;</li>
+          <li><strong>Google LLC</strong>: fonts (Google Fonts) and dangerous-site checks (Google Web Risk).</li>
+        </ul>
+        <p>
+          Some providers are based in the United States. Any transfers take place on the basis of the EU-US Data Privacy Framework or the
+          standard contractual clauses approved by the European Commission.
+        </p>
+      </section>
+
+      <section>
+        <h3>4. Your rights</h3>
+        <p>
+          You can request access to, rectification, erasure or restriction of your data and object to processing (Arts. 15-22 GDPR) by
+          writing to <a href="mailto:privacy@gs1it.org">privacy@gs1it.org</a>. As the statistics contain no identifiers, we may not be able
+          to find the events that concern you (Art. 11 GDPR). You also have the right to lodge a complaint with the Italian data protection
+          authority, the{' '}
+          <a href="https://www.garanteprivacy.it" target="_blank" rel="noreferrer">Garante per la protezione dei dati personali</a>.
+        </p>
+        <p>We do not carry out profiling or automated decisions that produce legal effects concerning you.</p>
+      </section>
+
+      <section>
+        <h3>5. Nature of the checks</h3>
+        <p>
+          The results shown by the app come from automatic checks carried out at the time of the scan and do not certify the authenticity
+          of the product.
+        </p>
+      </section>
+
+      <p className="legal-foot">
+        For processing carried out by GS1 Italy outside this app, the{' '}
+        <a href="https://gs1it.org/privacy-policy/" target="_blank" rel="noreferrer">gs1it.org privacy notice</a> applies.
+      </p>
+    </>
   )
 }

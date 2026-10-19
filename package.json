@@ -1,7 +1,7 @@
 {
   "name": "gs1-italy-vbg-app",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "tunnel": "npx --yes cloudflared@0.7.1 tunnel --url https://localhost:5173 --no-tls-verify",
     "deploy": "wrangler deploy",
-    "worker:dev": "wrangler dev"
+    "worker:dev": "wrangler dev",
+    "test": "vitest run"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -31,6 +32,7 @@
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
+    "vitest": "^3.2.4",
     "wrangler": "^4.149.0"
   }
 }

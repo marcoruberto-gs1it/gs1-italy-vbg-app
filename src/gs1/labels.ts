@@ -1,3 +1,6 @@
+import { lang } from '../i18n'
+
+/** Nomi in italiano degli Application Identifier (AI) più comuni. */
 const labels: Record<string, string> = {
   '00': 'SSCC',
   '01': 'GTIN',
@@ -79,6 +82,31 @@ const prefixLabels: [RegExp, string][] = [
   [/^9[1-9]$/, 'Informazioni aziendali'],
 ]
 
+/** English names of the most common Application Identifiers (GS1 General Specifications, sentence case). */
+const labelsEn: Record<string, string> = {
+  '00': 'SSCC', '01': 'GTIN', '02': 'GTIN of contained items', '10': 'Batch or lot', '11': 'Production date', '12': 'Due date',
+  '13': 'Packaging date', '15': 'Best before', '16': 'Sell by', '17': 'Expiry date', '20': 'Internal product variant', '21': 'Serial number',
+  '22': 'Consumer product variant', '235': 'Third-party serial number', '240': 'Additional product identification', '241': 'Customer part number',
+  '242': 'Made-to-order variant', '243': 'Packaging component', '250': 'Secondary serial number', '251': 'Reference to source entity',
+  '253': 'GDTI', '254': 'GLN extension', '255': 'GCN', '30': 'Variable count', '37': 'Count of trade items', '400': 'Customer’s order number',
+  '401': 'GINC', '402': 'GSIN', '403': 'Routing code', '410': 'Ship to GLN', '411': 'Bill to GLN', '412': 'Purchased from GLN',
+  '413': 'Ship for GLN', '414': 'Location GLN', '415': 'Invoicing party GLN', '416': 'Production location GLN', '417': 'Party GLN',
+  '420': 'Ship to postal code', '421': 'Ship to postal code', '422': 'Country of origin', '423': 'Country of initial processing',
+  '424': 'Country of processing', '425': 'Country of disassembly', '426': 'Country of full process chain', '7003': 'Expiry date and time',
+  '7006': 'First freeze date', '7007': 'Harvest date', '7008': 'Aquatic species', '7009': 'Fishing area', '7010': 'Production method',
+  '8003': 'GRAI', '8004': 'GIAI', '8006': 'ITIP', '8008': 'Production date and time', '8010': 'CPID', '8011': 'CPID serial number',
+  '8012': 'Software version', '8013': 'GMN', '8017': 'Service provider GSRN', '8018': 'Service recipient GSRN', '8020': 'Payment slip reference',
+  '8200': 'Product URL', '90': 'Mutually agreed information',
+}
+
+const prefixLabelsEn: [RegExp, string][] = [
+  [/^310\d$/, 'Net weight'], [/^315\d$/, 'Net volume'], [/^316\d$/, 'Net volume'], [/^320\d$/, 'Net weight'], [/^330\d$/, 'Gross weight'],
+  [/^311\d$/, 'Length'], [/^312\d$/, 'Width'], [/^313\d$/, 'Height'], [/^314\d$/, 'Area'], [/^390\d$/, 'Amount payable'],
+  [/^392\d$/, 'Price'], [/^9[1-9]$/, 'Company internal information'],
+]
+
+/** Nome dell'AI nella lingua corrente; altrimenti il titolo della tabella GS1 o il numero dell'AI. */
 export function aiLabel(ai: string, fallback?: string) {
-  return labels[ai] ?? prefixLabels.find(([re]) => re.test(ai))?.[1] ?? fallback?.trim() ?? `AI ${ai}`
+  const [map, prefixes] = lang() === 'en' ? [labelsEn, prefixLabelsEn] : [labels, prefixLabels]
+  return map[ai] ?? prefixes.find(([re]) => re.test(ai))?.[1] ?? fallback?.trim() ?? `AI ${ai}`
 }

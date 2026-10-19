@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, RefreshCw } from 'lucide-react'
 import { fetchLatestVersion, loadVersion } from '../lib/update'
+import { t } from '../i18n'
 
 type State = 'idle' | 'checking' | 'latest' | 'offline'
 
@@ -21,7 +22,7 @@ export function AppVersion() {
     <div className="app-version">
       <span title={`build ${__APP_VERSION__}`}>v. {__APP_RELEASE__}</span>
       <button type="button" onClick={() => void check()} disabled={state === 'checking'}>
-        {state === 'latest' ? <><Check size={15} /> È l’ultima</> : state === 'offline' ? 'Sei offline: riprova' : <><RefreshCw size={15} className={state === 'checking' ? 'spin' : undefined} /> Cerca aggiornamenti</>}
+        {state === 'latest' ? <><Check size={15} /> {t('È l’ultima')}</> : state === 'offline' ? t('Sei offline: riprova') : <><RefreshCw size={15} className={state === 'checking' ? 'spin' : undefined} /> {t('Cerca aggiornamenti')}</>}
       </button>
     </div>
   )

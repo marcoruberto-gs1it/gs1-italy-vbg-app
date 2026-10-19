@@ -5,6 +5,7 @@
  * parentesi o FNC1 e URI GS1 Digital Link (anche compressi).
  */
 import type { AiValues } from '../vendor/gs1/GS1DigitalLinkToolkit.js'
+import { locale, t } from '../i18n'
 import { aiLabel } from './labels'
 
 export type Tone = 'ok' | 'warn' | 'bad'
@@ -38,6 +39,15 @@ let toolkitPromise: Promise<Toolkit> | null = null
 let prefixesPromise: Promise<{ prefix: string; mo: string }[]> | null = null
 let countriesPromise: Promise<Map<string, string>> | null = null
 
+/** Nome del paese nella lingua corrente, dal codice ISO 3166-1 alpha-2. */
+function countryName(alpha2: string) {
+  try {
+    return new Intl.DisplayNames([locale()], { type: 'region' }).of(alpha2) ?? alpha2
+  } catch {
+    return alpha2
+  }
+}
+
 export function loadToolkit() {
   toolkitPromise ??= import('../vendor/gs1/GS1DigitalLinkToolkit.js').then(({ default: T }) => new T())
   return toolkitPromise
@@ -54,8 +64,8 @@ function loadPrefixes() {
 
 function loadCountries() {
   countriesPromise ??= import('../vendor/gs1/countries.json').then(({ default: list }) => {
-    const names = new Intl.DisplayNames(['it'], { type: 'region' })
-    return new Map((list as { 'alpha-2': string; 'country-code': string }[]).map((c) => [c['country-code'], names.of(c['alpha-2']) ?? c['alpha-2']]))
+    // Codice numerico ISO 3166 → codice alpha-2 (il nome si calcola nella lingua corrente).
+    return new Map((list as { 'alpha-2': string; 'country-code': string }[]).map((c) => [c['country-code'], c['alpha-2']]))
   })
   return countriesPromise
 }
@@ -84,20 +94,21 @@ function parseGs1Date(value: string) {
   return day === 0 ? new Date(year, month, 0) : new Date(year, month - 1, day)
 }
 
-const dateFmt = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
 
 function describeDate(ai: string, value: string): Pick<Field, 'display' | 'note' | 'tone'> {
   if (!/^\d{6}$/.test(value)) return { display: value }
   const date = parseGs1Date(value)
-  const display = value.endsWith('00') ? date.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : dateFmt.format(date)
+  const display = value.endsWith('00')
+    ? date.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
+    : date.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
   if (ai !== '17' && ai !== '15') return { display }
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const days = Math.round((date.getTime() - today.getTime()) / 86_400_000)
-  if (days < 0) return { display, note: ai === '17' ? 'Scaduto' : 'Superato', tone: 'bad' }
-  if (days === 0) return { display, note: 'Oggi', tone: 'warn' }
-  if (days <= 7) return { display, note: `Tra ${days} ${days === 1 ? 'giorno' : 'giorni'}`, tone: 'warn' }
-  return { display, note: 'Valido', tone: 'ok' }
+  if (days < 0) return { display, note: ai === '17' ? t('Scaduto') : t('Superato'), tone: 'bad' }
+  if (days === 0) return { display, note: t('Oggi'), tone: 'warn' }
+  if (days <= 7) return { display, note: days === 1 ? t('Tra 1 giorno') : t('Tra {n} giorni', { n: days }), tone: 'warn' }
+  return { display, note: t('Valido'), tone: 'ok' }
 }
 
 const measureUnits: Record<string, string> = {
@@ -114,14 +125,14 @@ function formatDisplay(ai: string, value: string, countries: Map<string, string>
   if (ai.length === 4 && unit) {
     const decimals = Number(ai[3])
     const amount = Number(value) / 10 ** decimals
-    return { display: `${amount.toLocaleString('it-IT', { maximumFractionDigits: decimals })} ${unit}` }
+    return { display: `${amount.toLocaleString(locale(), { maximumFractionDigits: decimals })} ${unit}` }
   }
   if (/^39[02]\d$/.test(ai)) {
     const amount = Number(value) / 10 ** Number(ai[3])
-    return { display: amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: Number(ai[3]) }) }
+    return { display: amount.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: Number(ai[3]) }) }
   }
   if (['422', '423', '424', '425', '426'].includes(ai)) {
-    const names = value.match(/\d{3}/g)?.map((code) => countries.get(code) ?? code)
+    const names = value.match(/\d{3}/g)?.map((code) => (countries.has(code) ? countryName(countries.get(code)!) : code))
     if (names) return { display: names.join(', ') }
   }
   return { display: value }

@@ -2,15 +2,17 @@
  * Controllo del link negli elenchi di siti malevoli di Google (Web Risk), tramite il Worker che
  * custodisce la chiave. Se la chiave non è configurata il Worker risponde checked: false.
  */
+import { t } from '../i18n'
+
 const VBG_BASE = import.meta.env.VITE_VBG_BASE ?? '/api/vbg'
 const ENDPOINT = VBG_BASE.replace(/\/api\/vbg\/?$/, '/api/linkcheck')
 
 export type WebRiskResult = { checked: boolean; threats: string[] }
 
 const labels: Record<string, string> = {
-  MALWARE: 'software dannoso (malware)',
-  SOCIAL_ENGINEERING: 'phishing o truffa',
-  UNWANTED_SOFTWARE: 'software indesiderato',
+  get MALWARE() { return t('software dannoso (malware)') },
+  get SOCIAL_ENGINEERING() { return t('phishing o truffa') },
+  get UNWANTED_SOFTWARE() { return t('software indesiderato') },
 }
 
 export function threatLabel(type: string) {

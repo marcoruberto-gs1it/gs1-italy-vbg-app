@@ -2552,6 +2552,14 @@
   animation: fade-in 250ms both;
 }
 
+/* Lingua */
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.lang-switch { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.lang-switch button { min-width: 40px; height: 32px; padding: 0 10px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
+.lang-switch button.is-active { background: var(--navy); color: #fff; }
+.lang-switch.is-compact button { min-width: 34px; height: 30px; padding: 0 8px; font-size: 12px; }
+.drawer-lang { padding: 4px 12px 8px; }
+
 /* Versione dell'app nel menu */
 .app-version {
   display: flex;

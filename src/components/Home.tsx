@@ -6,12 +6,13 @@ import type { CameraError } from '../scanner/useScanner'
 import type { InfoTopic } from './Chrome'
 import { Footer } from './Chrome'
 import { HeroBadge, IllCodes, IllPhone, IllShield } from './Illustrations'
+import { t } from '../i18n'
 
 const offText: Partial<Record<CameraError, string>> = {
-  denied: 'Consenti l’accesso alla fotocamera nelle impostazioni del browser per tornare a scansionare.',
-  insecure: 'La fotocamera funziona solo da un indirizzo https://. Nel frattempo puoi inserire il codice a mano.',
-  unsupported: 'Questo browser non dà accesso alla fotocamera. Puoi inserire il codice a mano.',
-  notfound: 'Non è stata trovata nessuna fotocamera. Puoi inserire il codice a mano.',
+  get denied() { return t('Consenti l’accesso alla fotocamera nelle impostazioni del browser per tornare a scansionare.') },
+  get insecure() { return t('La fotocamera funziona solo da un indirizzo https://. Nel frattempo puoi inserire il codice a mano.') },
+  get unsupported() { return t('Questo browser non dà accesso alla fotocamera. Puoi inserire il codice a mano.') },
+  get notfound() { return t('Non è stata trovata nessuna fotocamera. Puoi inserire il codice a mano.') },
 }
 
 type Props = {
@@ -61,35 +62,35 @@ export function Home({ cameraIssue, onScan, onManual, onInfo, onPrivacy }: Props
       <section className={`status-card ${off ? 'is-off' : ''}`} aria-live="polite">
         <div className="status-copy">
           <h1>
-            {off ? 'Fotocamera' : 'Scanner'}
+            {off ? t('Fotocamera') : t('Scanner')}
             <br />
-            <em>{off ? 'non attiva' : 'pronto'}</em>
+            <em>{off ? t('non attiva') : t('pronto')}</em>
           </h1>
-          <p>{off ?? 'Inquadra un barcode o un QR Code Standard GS1 e leggi subito i dati del prodotto.'}</p>
+          <p>{off ?? t('Inquadra un barcode o un QR Code Standard GS1 e leggi subito i dati del prodotto.')}</p>
         </div>
         <HeroBadge state={off ? 'off' : 'ready'} />
         {off && !canRetry ? (
-          <button className="cta cta-navy" type="button" onClick={onManual}><Keyboard size={20} /> Inserisci un codice</button>
+          <button className="cta cta-navy" type="button" onClick={onManual}><Keyboard size={20} /> {t('Inserisci un codice')}</button>
         ) : off ? (
-          <button className="cta cta-red" type="button" onClick={onScan}><RotateCcw size={20} /> Riattiva fotocamera</button>
+          <button className="cta cta-red" type="button" onClick={onScan}><RotateCcw size={20} /> {t('Riattiva fotocamera')}</button>
         ) : (
-          <button className="cta" type="button" onClick={onScan}><ScanBarcode size={21} /> Scansiona un codice</button>
+          <button className="cta" type="button" onClick={onScan}><ScanBarcode size={21} /> {t('Scansiona un codice')}</button>
         )}
       </section>
 
       <section>
-        <h2 className="section-label reveal">Informazioni</h2>
+        <h2 className="section-label reveal">{t('Informazioni')}</h2>
         <div className="info-cards">
           <button className="info-card navy reveal" type="button" onClick={() => onInfo('codes')}>
-            <span className="info-text"><strong>Cosa puoi leggere</strong><small>Scopri di più</small></span>
+            <span className="info-text"><strong>{t('Cosa puoi leggere')}</strong><small>{t('Scopri di più')}</small></span>
             <IllCodes />
           </button>
           <button className="info-card white reveal" type="button" onClick={() => onInfo('how')}>
-            <span className="info-text"><strong>Come funziona l’app?</strong><small>Scopri di più</small></span>
+            <span className="info-text"><strong>{t('Come funziona l’app?')}</strong><small>{t('Scopri di più')}</small></span>
             <IllPhone />
           </button>
           <button className="info-card peach reveal" type="button" onClick={() => onInfo('vbg')}>
-            <span className="info-text"><strong>Cos’è Verified by GS1?</strong><small>Scopri di più</small></span>
+            <span className="info-text"><strong>{t('Cos’è Verified by GS1?')}</strong><small>{t('Scopri di più')}</small></span>
             <IllShield />
           </button>
         </div>

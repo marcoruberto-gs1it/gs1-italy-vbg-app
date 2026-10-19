@@ -10,6 +10,8 @@ import { codeType, gs1Compliance, titleOf, type Scan } from '../components/scan'
 import { isDark } from '../components/symbolData'
 import { assessLink, registrableDomain } from '../gs1/linkSafety'
 import { canVerify } from '../gs1/vbg'
+import { locale, t } from '../i18n'
+import { formatLabel } from '../lib/display'
 
 type RGB = [number, number, number]
 const NAVY: RGB = [0, 44, 108]
@@ -178,8 +180,8 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   const w = new Writer()
   const { doc } = w
   const now = new Date()
-  const stamp = now.toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' })
-  const scannedAt = new Date(scan.at).toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' })
+  const stamp = now.toLocaleString(locale(), { dateStyle: 'long', timeStyle: 'short' })
+  const scannedAt = new Date(scan.at).toLocaleString(locale(), { dateStyle: 'long', timeStyle: 'short' })
 
   // Intestazione
   doc.setFillColor(...NAVY)
@@ -193,10 +195,10 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
   doc.setTextColor(255, 255, 255)
-  doc.text('Rapporto di verifica', M + 38, 16)
+  doc.text(t('Rapporto di verifica'), M + 38, 16)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9.5)
-  doc.text(clean(`Generato il ${stamp}`), M + 38, 23)
+  doc.text(clean(t('Generato il {date}', { date: stamp })), M + 38, 23)
   doc.setFillColor(...ORANGE)
   doc.rect(0, 34, PAGE_W, 1.4, 'F')
   w.y = 46
@@ -204,26 +206,26 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   // Codice letto
   const type = codeType(scan)
   const compliance = gs1Compliance(scan)
-  w.section('Codice letto')
+  w.section(t('Codice letto'))
   const symbolSize = 38
   const top = w.y
   const symbolH = drawSymbol(w, scan, M + CONTENT_W - symbolSize, top - 4, symbolSize)
   const textW = symbolH ? CONTENT_W - symbolSize - 8 : CONTENT_W
-  w.paragraph(type.title, { size: 15, bold: true, color: NAVY, width: textW })
-  w.paragraph(`${type.tag}${type.manual ? ' · inserito a mano' : ''}`, { size: 10, color: MUTED, width: textW })
+  w.paragraph(formatLabel(type.title), { size: 15, bold: true, color: NAVY, width: textW })
+  w.paragraph(`${type.tag}${type.manual ? ` · ${t('inserito a mano')}` : ''}`, { size: 10, color: MUTED, width: textW })
   if (scan.primary) w.paragraph(`${scan.primary.label}: ${scan.primary.display}`, { size: 12, bold: true, width: textW })
   else w.paragraph(scan.raw, { size: 10, width: textW })
-  w.paragraph(`Letto il ${scannedAt}`, { size: 8.5, color: MUTED, width: textW })
+  w.paragraph(t('Letto il {date}', { date: scannedAt }), { size: 8.5, color: MUTED, width: textW })
   w.y = Math.max(w.y, top + symbolH + 2)
-  w.box(compliance.title, `${compliance.detail}${compliance.markup ? `  Dato: ${compliance.markup}` : ''}`, levelColor[compliance.level] ?? MUTED)
+  w.box(compliance.title, `${compliance.detail}${compliance.markup ? `  ${t('Dato:')} ${compliance.markup}` : ''}`, levelColor[compliance.level] ?? MUTED)
 
   // Dati codificati
   if (scan.kind === 'gs1') {
-    w.section('Dati codificati')
+    w.section(t('Dati codificati'))
     for (const f of [...(scan.primary ? [scan.primary] : []), ...scan.fields]) {
       w.row(`${f.label} (${f.ai})`, f.note ? `${f.display} — ${f.note}` : f.display)
     }
-    if (scan.checkDigit !== undefined) w.row('Cifra di controllo', scan.checkDigit ? 'Corretta' : 'Errata', { mark: scan.checkDigit ? 'ok' : 'bad' })
+    if (scan.checkDigit !== undefined) w.row(t('Cifra di controllo'), scan.checkDigit ? t('Corretta') : t('Errata'), { mark: scan.checkDigit ? 'ok' : 'bad' })
     if (scan.digitalLink) w.row('GS1 Digital Link', scan.digitalLink, { mono: true })
   }
 
@@ -231,32 +233,32 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   if (canVerify(scan.primary?.ai)) {
     const v = scan.vbg
     w.section('Verified by GS1')
-    if (!v) w.paragraph('Verifica non completata al momento della generazione del rapporto.', { color: MUTED })
+    if (!v) w.paragraph(t('Verifica non completata al momento della generazione del rapporto.'), { color: MUTED })
     else {
-      const verdict = { verified: ['Prodotto verificato', OK], licensed: ['Codice registrato', NAVY], invalid: ['Codice non verificato', BAD], error: ['Verifica non disponibile', MUTED] }[v.state] as [string, RGB]
-      w.box(verdict[0], v.state === 'verified' ? 'Dati pubblicati dal titolare su Verified by GS1 (registro GS1 Italy).' : v.message ?? 'Il numero è assegnato a un’azienda registrata presso GS1.', verdict[1])
+      const verdict = { verified: [t('Prodotto verificato'), OK], licensed: [t('Codice registrato'), NAVY], invalid: [t('Codice non verificato'), BAD], error: [t('Verifica non disponibile'), MUTED] }[v.state] as [string, RGB]
+      w.box(verdict[0], v.state === 'verified' ? t('Dati pubblicati dal titolare su Verified by GS1 (registro GS1 Italy).') : v.message ?? t('Il numero è assegnato a un’azienda registrata presso GS1.'), verdict[1])
       if (scan.primary?.ai === '01' && (v.state === 'verified' || v.state === 'licensed')) {
         const core: [string, string | undefined][] = [
           ['GTIN', v.gtin],
-          ['Marca', v.brand],
-          ['Descrizione', v.name],
-          ['Immagine', v.image],
-          ['Categoria', v.categoryName ? `${v.categoryName} (GPC ${v.category})` : v.category ? `GPC ${v.category}` : undefined],
-          ['Contenuto netto', v.netContent],
-          ['Paese di vendita', v.countries],
+          [t('Marca'), v.brand],
+          [t('Descrizione'), v.name],
+          [t('Immagine'), v.image],
+          [t('Categoria'), v.categoryName ? `${v.categoryName} (GPC ${v.category})` : v.category ? `GPC ${v.category}` : undefined],
+          [t('Contenuto netto'), v.netContent],
+          [t('Paese di vendita'), v.countries],
         ]
         w.ensure(30)
-        w.paragraph(`I 7 dati essenziali: ${core.filter(([, value]) => value).length}/7`, { bold: true, color: NAVY })
-        for (const [label, value] of core) w.row(label, value ?? 'Non pubblicato', { mark: value ? 'ok' : 'missing', mono: label === 'Immagine' && Boolean(value) })
+        w.paragraph(t('I 7 dati essenziali: {n}/7', { n: core.filter(([, value]) => value).length }), { bold: true, color: NAVY })
+        for (const [label, value] of core) w.row(label, value ?? t('Non pubblicato'), { mark: value ? 'ok' : 'missing', mono: label === t('Immagine') && Boolean(value) })
       }
       if (v.licensee) {
         w.ensure(30)
-        w.paragraph('Titolare del codice', { bold: true, color: NAVY })
-        w.row('Azienda', v.licensee.name)
-        if (v.licensee.address) w.row('Indirizzo', v.licensee.address)
+        w.paragraph(t('Titolare del codice'), { bold: true, color: NAVY })
+        w.row(t('Azienda'), v.licensee.name)
+        if (v.licensee.address) w.row(t('Indirizzo'), v.licensee.address)
         if (v.licensee.gln) w.row('GLN', v.licensee.gln, { mono: true })
-        if (v.licensee.mo) w.row('Licenza', v.licensee.mo)
-        if (v.licensee.website) w.row('Sito web', v.licensee.website, { mono: true })
+        if (v.licensee.mo) w.row(t('Licenza'), v.licensee.mo)
+        if (v.licensee.website) w.row(t('Sito web'), v.licensee.website, { mono: true })
       }
     }
   }
@@ -264,25 +266,25 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   // Link
   if (scan.url) {
     const check = assessLink(scan.url, scan.kind === 'gs1' ? (canVerify(scan.primary?.ai) ? scan.vbg : null) : null, scan.webRisk)
-    const verdict = { trusted: ['Link verificato', OK], unknown: ['Dominio non riconosciuto', WARN], danger: ['Link sospetto', BAD], pending: ['Controllo non completato', MUTED] }[check.level] as [string, RGB]
-    w.section(scan.kind === 'gs1' ? 'Link nel QR Code Standard GS1' : 'Link nel codice')
-    w.row('Indirizzo letto', scan.url, { mono: true })
-    w.row('Dominio', registrableDomain(check.host), { mono: true })
+    const verdict = { trusted: [t('Link verificato'), OK], unknown: [t('Dominio non riconosciuto'), WARN], danger: [t('Link sospetto'), BAD], pending: [t('Controllo non completato'), MUTED] }[check.level] as [string, RGB]
+    w.section(scan.kind === 'gs1' ? t('Link nel QR Code Standard GS1') : t('Link nel codice'))
+    w.row(t('Indirizzo letto'), scan.url, { mono: true })
+    w.row(t('Dominio'), registrableDomain(check.host), { mono: true })
     w.box(verdict[0], check.reasons.join(' '), verdict[1])
   }
 
   // Controlli eseguiti
-  w.section('Controlli eseguiti')
+  w.section(t('Controlli eseguiti'))
   const checks: [string, string, 'ok' | 'missing' | 'bad'][] = []
-  checks.push(['Lettura del simbolo', `${type.title}${scan.symbol ? `, ${scan.symbol.w}×${scan.symbol.h} moduli` : ''}`, 'ok'])
+  checks.push([t('Lettura del simbolo'), `${formatLabel(type.title)}${scan.symbol ? `, ${t('{w}×{h} moduli', { w: scan.symbol.w, h: scan.symbol.h })}` : ''}`, 'ok'])
   if (scan.kind === 'gs1') {
-    checks.push(['Interpretazione GS1', 'GS1 Digital Link Toolkit (GS1)', 'ok'])
-    checks.push(['Sintassi GS1', scan.syntax ? (scan.syntax.ok ? 'Conforme · GS1 Barcode Syntax Engine' : `Errori · ${scan.syntax.message ?? ''}`) : 'Non eseguito', scan.syntax ? (scan.syntax.ok ? 'ok' : 'bad') : 'missing'])
+    checks.push([t('Interpretazione GS1'), 'GS1 Digital Link Toolkit (GS1)', 'ok'])
+    checks.push([t('Sintassi GS1'), scan.syntax ? (scan.syntax.ok ? t('Conforme · GS1 Barcode Syntax Engine') : `${t('Errori')} · ${scan.syntax.message ?? ''}`) : t('Non eseguito'), scan.syntax ? (scan.syntax.ok ? 'ok' : 'bad') : 'missing'])
   }
-  if (canVerify(scan.primary?.ai)) checks.push(['Registro Verified by GS1', scan.vbg ? (scan.vbg.state === 'error' ? 'Non disponibile' : 'Eseguito · API GS1 Italy') : 'Non completato', scan.vbg && scan.vbg.state !== 'error' ? 'ok' : 'missing'])
+  if (canVerify(scan.primary?.ai)) checks.push([t('Registro Verified by GS1'), scan.vbg ? (scan.vbg.state === 'error' ? t('Non disponibile') : t('Eseguito · API GS1 Italy')) : t('Non completato'), scan.vbg && scan.vbg.state !== 'error' ? 'ok' : 'missing'])
   if (scan.url) {
-    checks.push(['Dominio del link', 'Confronto con i domini registrati dal titolare', 'ok'])
-    checks.push(['Elenchi siti malevoli', scan.webRisk?.checked ? (scan.webRisk.threats.length ? 'Sito segnalato · Google Web Risk' : 'Nessuna segnalazione · Google Web Risk') : 'Non attivo', scan.webRisk?.checked ? (scan.webRisk.threats.length ? 'bad' : 'ok') : 'missing'])
+    checks.push([t('Dominio del link'), t('Confronto con i domini registrati dal titolare'), 'ok'])
+    checks.push([t('Elenchi siti malevoli'), scan.webRisk?.checked ? (scan.webRisk.threats.length ? t('Sito segnalato · Google Web Risk') : t('Nessuna segnalazione · Google Web Risk')) : t('Non attivo'), scan.webRisk?.checked ? (scan.webRisk.threats.length ? 'bad' : 'ok') : 'missing'])
   }
   for (const [label, value, mark] of checks) w.row(label, value, { mark })
 
@@ -296,12 +298,12 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(...MUTED)
-    const note = doc.splitTextToSize(clean('Il rapporto riporta l’esito di controlli automatici eseguiti al momento della scansione e non costituisce una certificazione di autenticità del prodotto. GS1 Italy · Via Paleocapa 7, 20121 Milano · gs1it.org'), CONTENT_W - 18) as string[]
+    const note = doc.splitTextToSize(clean(t('Il rapporto riporta l’esito di controlli automatici eseguiti al momento della scansione e non costituisce una certificazione di autenticità del prodotto. GS1 Italy · Via Paleocapa 7, 20121 Milano · gs1it.org')), CONTENT_W - 18) as string[]
     doc.text(note, M, PAGE_H - 12)
     doc.text(`${p}/${pages}`, PAGE_W - M, PAGE_H - 12, { align: 'right' })
   }
 
   const id = (scan.primary?.value ?? titleOf(scan)).replace(/[^0-9A-Za-z.-]+/g, '-').slice(0, 40)
   const day = now.toISOString().slice(0, 10)
-  return { blob: doc.output('blob'), filename: `verifica-${id}-${day}.pdf` }
+  return { blob: doc.output('blob'), filename: `${t('verifica')}-${id}-${day}.pdf` }
 }

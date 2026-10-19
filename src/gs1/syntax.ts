@@ -5,6 +5,7 @@
  * tra AI (combinazioni vietate e AI obbligatori).
  */
 import type { ScanResult } from './interpret'
+import { lang, t } from '../i18n'
 
 export type SyntaxCheck = {
   ok: boolean
@@ -30,37 +31,43 @@ export function loadSyntaxEngine() {
   return enginePromise
 }
 
+/** Segna un testo da tradurre senza tradurlo subito. */
+const k = (s: string) => s
+
 const phrases: [RegExp, string][] = [
-  [/The date contains an illegal month of the year\.?/i, 'il mese della data non esiste'],
-  [/The date contains an illegal day of the month\.?/i, 'il giorno della data non esiste'],
-  [/The numeric check digit is incorrect\.?/i, 'la cifra di controllo è errata'],
-  [/The (?:data|component) is too short\.?/i, 'il valore è troppo corto'],
-  [/The (?:data|component) is too long\.?/i, 'il valore è troppo lungo'],
-  [/contains an illegal character\.?/i, 'contiene un carattere non ammesso'],
-  [/A non-digit character was found where a digit is expected\.?/i, 'contiene una lettera dove è richiesta una cifra'],
-  [/The hour.*illegal/i, 'l’ora non è valida'],
-  [/The (?:minute|second).*illegal/i, 'i minuti o i secondi non sono validi'],
-  [/is not a valid ISO 3166 .*country code/i, 'il codice paese non è valido'],
-  [/is not a valid ISO 4217 .*currency code/i, 'il codice valuta non è valido'],
-  [/The GCP .* is (?:too short|invalid)/i, 'il prefisso aziendale GS1 non è valido'],
+  [/The date contains an illegal month of the year\.?/i, k('il mese della data non esiste')],
+  [/The date contains an illegal day of the month\.?/i, k('il giorno della data non esiste')],
+  [/The numeric check digit is incorrect\.?/i, k('la cifra di controllo è errata')],
+  [/The (?:data|component) is too short\.?/i, k('il valore è troppo corto')],
+  [/The (?:data|component) is too long\.?/i, k('il valore è troppo lungo')],
+  [/contains an illegal character\.?/i, k('contiene un carattere non ammesso')],
+  [/A non-digit character was found where a digit is expected\.?/i, k('contiene una lettera dove è richiesta una cifra')],
+  [/The hour.*illegal/i, k('l’ora non è valida')],
+  [/The (?:minute|second).*illegal/i, k('i minuti o i secondi non sono validi')],
+  [/is not a valid ISO 3166 .*country code/i, k('il codice paese non è valido')],
+  [/is not a valid ISO 4217 .*currency code/i, k('il codice valuta non è valido')],
+  [/The GCP .* is (?:too short|invalid)/i, k('il prefisso aziendale GS1 non è valido')],
 ]
 
 /** Traduce i messaggi più comuni della libreria; per gli altri resta il testo originale. */
 export function translate(message: string): string {
+  // In inglese il messaggio originale della GS1 Barcode Syntax Engine è già leggibile.
+  if (lang() === 'en') return message
   let m: RegExpMatchArray | null
   if ((m = message.match(/It is invalid to pair AI \((\d+)\) with AI \((\d+)\)/i))) {
-    return `Gli AI (${m[1]}) e (${m[2]}) non possono comparire nello stesso codice.`
+    return t('Gli AI ({a}) e ({b}) non possono comparire nello stesso codice.', { a: m[1], b: m[2] })
   }
   if ((m = message.match(/Required AIs for AI \((\d+)\) are not satisfied: ([\d,+ ]+)/i))) {
     const options = m[2].split(',').map((s) => s.trim()).join(', ')
-    return `L’AI (${m[1]}) richiede anche uno di questi AI, che mancano: ${options}.`
+    return t('L’AI ({ai}) richiede anche uno di questi AI, che mancano: {list}.', { ai: m[1], list: options })
   }
   if ((m = message.match(/^AI \((\d+)\):\s*(.*)$/i))) {
     const phrase = phrases.find(([re]) => re.test(m![2]))
-    return phrase ? `AI (${m[1]}): ${phrase[1]}.` : message
+    return phrase ? `AI (${m[1]}): ${t(phrase[1])}.` : message
   }
   const phrase = phrases.find(([re]) => re.test(message))
-  return phrase ? phrase[1][0].toUpperCase() + phrase[1].slice(1) + '.' : message
+  const text = phrase && t(phrase[1])
+  return text ? text[0].toUpperCase() + text.slice(1) + '.' : message
 }
 
 function asAiString(scan: ScanResult) {
@@ -92,7 +99,7 @@ export async function checkSyntax(scan: ScanResult): Promise<SyntaxCheck | null>
       engine.dataStr = scan.url
     } catch (error) {
       const original = error instanceof Error ? error.message : String(error)
-      return { ok: false, digitalLink: true, message: `Il link non rispetta la sintassi GS1 Digital Link: ${translate(original)}`, original, markup: engine.errMarkup || undefined }
+      return { ok: false, digitalLink: true, message: t('Il link non rispetta la sintassi GS1 Digital Link: {error}', { error: translate(original) }), original, markup: engine.errMarkup || undefined }
     }
   }
   return { ok: true }

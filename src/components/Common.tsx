@@ -4,6 +4,8 @@ import { useGSAP } from '@gsap/react'
 import { ChevronRight, TriangleAlert, X } from 'lucide-react'
 import { FormatIcon } from './Illustrations'
 import { formatKind, titleOf, type Scan } from './scan'
+import { t } from '../i18n'
+import { formatLabel, shortDateTime } from '../lib/display'
 
 export function Sheet({ title, action, tall, onClose, children }: { title: string; action?: ReactNode; tall?: boolean; onClose: () => void; children: ReactNode }) {
   const scope = useRef<HTMLDivElement>(null)
@@ -30,7 +32,7 @@ export function Sheet({ title, action, tall, onClose, children }: { title: strin
           <header className="sheet-head">
             <h2>{title}</h2>
             {action}
-            <button className="icon-btn soft" type="button" onClick={onClose} aria-label="Chiudi">
+            <button className="icon-btn soft" type="button" onClick={onClose} aria-label={t('Chiudi')}>
               <X size={18} />
             </button>
           </header>
@@ -41,7 +43,6 @@ export function Sheet({ title, action, tall, onClose, children }: { title: strin
   )
 }
 
-const timeFmt = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
 
 export function HistoryList({ items, onOpen }: { items: Scan[]; onOpen: (item: Scan) => void }) {
   const scope = useRef<HTMLUListElement>(null)
@@ -60,7 +61,7 @@ export function HistoryList({ items, onOpen }: { items: Scan[]; onOpen: (item: S
             <span className="tile"><FormatIcon kind={formatKind(item.format)} /></span>
             <span className="last-text">
               <strong>{titleOf(item)}</strong>
-              <small>{item.format} · {timeFmt.format(item.at)}</small>
+              <small>{formatLabel(item.format)} · {shortDateTime(item.at)}</small>
             </span>
             {item.checkDigit === false ? <TriangleAlert className="warn" size={18} /> : <ChevronRight className="chev" size={20} />}
           </button>
@@ -74,9 +75,9 @@ export function ManualForm({ onSubmit }: { onSubmit: (value: string) => Promise<
   const [value, setValue] = useState('')
   return (
     <form className="manual" onSubmit={(e) => { e.preventDefault(); if (value.trim()) void onSubmit(value.trim()) }}>
-      <p className="manual-hint">Il numero sotto il barcode, una stringa GS1 come (01)…(17)… oppure un link.</p>
-      <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="8001234567897" inputMode="text" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Codice" />
-      <button className="cta" type="submit" disabled={!value.trim()}>Leggi il codice</button>
+      <p className="manual-hint">{t('Il numero sotto il barcode, una stringa GS1 come (01)…(17)… oppure un link.')}</p>
+      <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="8001234567897" inputMode="text" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label={t('Codice')} />
+      <button className="cta" type="submit" disabled={!value.trim()}>{t('Leggi il codice')}</button>
     </form>
   )
 }
