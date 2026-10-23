@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { acquireCamera, parkCamera } from './camera'
+import { byPosition } from './decodeImage'
 import type { DecoderRequest, DecoderResponse, Hit, Quad } from './types'
 
 export type CameraError = 'insecure' | 'unsupported' | 'denied' | 'notfound' | 'busy' | 'unknown'
@@ -10,7 +11,8 @@ type Options = {
   enabled: boolean
   /** Decodifica attiva (nessun esito o pannello sopra lo scanner). */
   active: boolean
-  onDetect: (hit: Hit, quad: Quad) => void
+  /** Barcode letti (più di uno solo da un'etichetta con GS1-128), con la posizione sullo schermo. */
+  onDetect: (hits: Hit[], quads: Quad[]) => void
 }
 
 type FrameMap = { scale: number; factor: number; width: number; mirrored: boolean }
@@ -19,6 +21,14 @@ const MAX_SIDE = 1280
 const MIN_INTERVAL = 70
 // Simbologie senza cifra di controllo obbligatoria: chiediamo due letture identiche.
 const NEEDS_CONFIRM = /Codabar|Code39|Code93|ITF/
+/**
+ * Etichetta logistica: con un GS1-128 (identificatore ]C1) nell'inquadratura si raccolgono per poco
+ * tempo tutti i barcode visibili, perché i dati dell'articolo stanno spesso su 2–3 GS1-128. Con EAN,
+ * QR Code e gli altri si consegna subito il primo barcode, come sempre (sullo scaffale ci sono i
+ * barcode dei prodotti vicini).
+ */
+const LABEL_WINDOW = 600
+const isGs1128 = (hit: Hit) => hit.symbologyIdentifier === ']C1'
 
 function classify(error: unknown): CameraError {
   const name = error instanceof DOMException ? error.name : (error as { name?: string })?.name
@@ -41,7 +51,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
   const sessionRef = useRef(0)
   const activeRef = useRef(active)
   const onDetectRef = useRef(onDetect)
-  const pendingRef = useRef(new Map<number, (hit: Hit | null) => void>())
+  const pendingRef = useRef(new Map<number, (hits: Hit[]) => void>())
   const nextIdRef = useRef(1)
   const lastTextRef = useRef<{ text: string; at: number } | null>(null)
 
@@ -54,13 +64,13 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
     const pending = pendingRef.current
     worker.onmessage = ({ data }: MessageEvent<DecoderResponse>) => {
       if (data.type !== 'result') return
-      pending.get(data.id)?.(data.hit)
+      pending.get(data.id)?.(data.hits)
       pending.delete(data.id)
     }
     workerRef.current = worker
     return () => {
       worker.terminate()
-      pending.forEach((resolve) => resolve(null))
+      pending.forEach((resolve) => resolve([]))
       pending.clear()
       workerRef.current = null
     }
@@ -68,8 +78,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
 
   const decode = useCallback((request: DecoderRequest, transfer: Transferable[] = []) => {
     const worker = workerRef.current
-    if (!worker) return Promise.resolve(null)
-    return new Promise<Hit | null>((resolve) => {
+    if (!worker) return Promise.resolve([] as Hit[])
+    return new Promise<Hit[]>((resolve) => {
       pendingRef.current.set(request.id, resolve)
       worker.postMessage(request, transfer)
     })
@@ -171,12 +181,32 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
     let busy = false
     let last = 0
     let stopped = false
+    // Barcode raccolti da un'etichetta con GS1-128: testo → lettura, posizione, quante volte visto.
+    let label: { until: number; seen: Map<string, { hit: Hit; quad: Quad; count: number }> } | null = null
     const canvas = document.createElement('canvas')
+
+    const deliver = (items: { hit: Hit; quad: Quad }[]) => {
+      if (!items.length) return
+      activeRef.current = false
+      label = null
+      const ordered = byPosition(items.map((i) => i.hit))
+      onDetectRef.current(ordered, ordered.map((hit) => items.find((i) => i.hit === hit)!.quad))
+    }
+    // Fine della raccolta: i barcode senza cifra di controllo valgono solo se letti almeno due volte.
+    const closeLabel = () => {
+      if (!label) return
+      const items = [...label.seen.values()].filter((i) => !NEEDS_CONFIRM.test(i.hit.format) || i.count > 1)
+      label = null
+      deliver(items)
+    }
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
       const video = videoRef.current
+      // Scanner in pausa (esito o pannello aperto): la raccolta in corso si annulla.
+      if (!activeRef.current) label = null
+      if (label && now >= label.until && !busy) return closeLabel()
       if (busy || !ctx || !video || !activeRef.current || now - last < MIN_INTERVAL || video.readyState < 2) return
       const vw = video.videoWidth
       const vh = video.videoHeight
@@ -198,26 +228,39 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
 
       busy = true
       const id = nextIdRef.current++
-      void decode({ type: 'frame', id, width: frame.width, height: frame.height, buffer: frame.data.buffer }, [frame.data.buffer]).then((hit) => {
+      void decode({ type: 'frame', id, width: frame.width, height: frame.height, buffer: frame.data.buffer }, [frame.data.buffer]).then((hits) => {
         busy = false
-        if (stopped || !hit || !activeRef.current) return
-        if (NEEDS_CONFIRM.test(hit.format)) {
-          const previous = lastTextRef.current
-          lastTextRef.current = { text: hit.text, at: now }
-          if (!previous || previous.text !== hit.text || now - previous.at > 1500) return
-        }
+        if (stopped || !activeRef.current) return
         const toScreen = ({ x, y }: { x: number; y: number }) => {
           const sx = (x / map.factor) * map.scale
           return { x: map.mirrored ? map.width - sx : sx, y: (y / map.factor) * map.scale }
         }
-        const p = hit.position
-        activeRef.current = false
-        onDetectRef.current(hit, {
+        const quadOf = ({ position: p }: Hit): Quad => ({
           topLeft: toScreen(p.topLeft),
           topRight: toScreen(p.topRight),
           bottomRight: toScreen(p.bottomRight),
           bottomLeft: toScreen(p.bottomLeft),
         })
+
+        // Etichetta con GS1-128: si raccolgono i barcode visibili fino alla fine della finestra.
+        if (!label && hits.some(isGs1128)) label = { until: now + LABEL_WINDOW, seen: new Map() }
+        if (label) {
+          for (const hit of hits) {
+            const known = label.seen.get(hit.text)
+            label.seen.set(hit.text, { hit, quad: quadOf(hit), count: (known?.count ?? 0) + 1 })
+          }
+          if (performance.now() >= label.until) closeLabel()
+          return
+        }
+
+        const hit = hits[0]
+        if (!hit) return
+        if (NEEDS_CONFIRM.test(hit.format)) {
+          const previous = lastTextRef.current
+          lastTextRef.current = { text: hit.text, at: now }
+          if (!previous || previous.text !== hit.text || now - previous.at > 1500) return
+        }
+        deliver([{ hit, quad: quadOf(hit) }])
       })
     }
     raf = requestAnimationFrame(tick)

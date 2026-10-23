@@ -277,7 +277,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
                   <span className="barcode-index" aria-hidden="true">{i + 1}</span>
                   <span>
                     <strong>{t('Barcode {i}', { i: i + 1 })}</strong>
-                    <small>{formatLabel(barcode.format)} · {t('{n} dati', { n: fields.length })}</small>
+                    <small>{formatLabel(barcode.format)} · {fields.length === 1 ? t('1 dato') : t('{n} dati', { n: fields.length })}</small>
                   </span>
                 </header>
                 <dl>

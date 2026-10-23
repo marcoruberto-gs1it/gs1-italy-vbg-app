@@ -87,7 +87,8 @@ function asUrl(text: string) {
   }
 }
 
-type Parsed = { values: AiValues; other: AiValues; url?: string; digitalLink?: string }
+/** order: AI nell'ordine del codice (le chiavi di un oggetto JavaScript non lo conservano: "37" finirebbe prima di "02"). */
+type Parsed = { values: AiValues; order?: string[]; other: AiValues; url?: string; digitalLink?: string }
 
 /**
  * Scomposizione con la GS1 Barcode Syntax Engine: AI e valori nell'ordine del codice, più il GS1 Digital
@@ -95,7 +96,7 @@ type Parsed = { values: AiValues; other: AiValues; url?: string; digitalLink?: s
  * Accetta AI non in dizionario e non controlla le associazioni tra AI: qui serve leggere, non validare
  * (lo fa checkSyntax, che trova l'engine con le impostazioni normali).
  */
-async function viaEngine(input: { ai: string } | { data: string }): Promise<{ values: AiValues; digitalLink?: string } | null> {
+async function viaEngine(input: { ai: string } | { data: string }): Promise<{ values: AiValues; order: string[]; digitalLink?: string } | null> {
   let engine: Awaited<ReturnType<typeof loadSyntaxEngine>>
   try {
     engine = await loadSyntaxEngine()
@@ -109,9 +110,12 @@ async function viaEngine(input: { ai: string } | { data: string }): Promise<{ va
     if ('ai' in input) engine.aiDataStr = input.ai
     else engine.dataStr = input.data
     const values: AiValues = {}
+    const order: string[] = []
     for (const line of engine.hri) {
       const m = line.match(/^\((\d{2,4})\) (.*)$/s)
-      if (m) values[m[1]] = m[2]
+      if (!m) continue
+      if (!(m[1] in values)) order.push(m[1])
+      values[m[1]] = m[2]
     }
     let digitalLink: string | undefined
     try {
@@ -119,7 +123,7 @@ async function viaEngine(input: { ai: string } | { data: string }): Promise<{ va
     } catch {
       digitalLink = undefined // nessuna chiave primaria: niente GS1 Digital Link
     }
-    return Object.keys(values).length ? { values, digitalLink } : null
+    return order.length ? { values, order, digitalLink } : null
   } catch {
     return null
   } finally {
@@ -146,7 +150,7 @@ async function extract(raw: string, manual: boolean): Promise<Parsed | null> {
       if (!uncompressed) return null
       const { GS1, other } = tk.extractFromGS1digitalLink(uncompressed)
       const engine = await viaEngine({ data: uncompressed })
-      if (engine) return { values: engine.values, other, url, digitalLink: engine.digitalLink }
+      if (engine) return { values: engine.values, order: engine.order, other, url, digitalLink: engine.digitalLink }
       return Object.keys(GS1).length ? { values: GS1, other, url } : null
     } catch {
       return null
@@ -158,12 +162,13 @@ async function extract(raw: string, manual: boolean): Promise<Parsed | null> {
   if (!looksGs1) return null
   // Dati grezzi del lettore: FNC1 iniziale e separatori GS diventano "^" per l'engine.
   const engine = await viaEngine(bracketed ? { ai: text } : { data: `^${text.replaceAll(GS, '^')}` })
-  if (engine) return { values: engine.values, other: {}, digitalLink: engine.digitalLink }
+  if (engine) return { values: engine.values, order: engine.order, other: {}, digitalLink: engine.digitalLink }
   // Dati non validi: si mostrano lo stesso. Con le parentesi gli AI si leggono direttamente (anche
   // quelli che il Toolkit non conosce); per i dati grezzi serve la tabella del Toolkit.
   if (bracketed) {
-    const values: AiValues = Object.fromEntries([...text.matchAll(/\((\d{2,4})\)((?:\\\(|[^(])*)/g)].map((m) => [m[1], m[2].replace(/\\\(/g, '(')]))
-    return Object.keys(values).length ? { values, other: {} } : null
+    const pairs = [...text.matchAll(/\((\d{2,4})\)((?:\\\(|[^(])*)/g)].map((m) => [m[1], m[2].replace(/\\\(/g, '(')] as const)
+    const values: AiValues = Object.fromEntries(pairs)
+    return pairs.length ? { values, order: [...new Set(pairs.map(([ai]) => ai))], other: {} } : null
   }
   try {
     const values = tk.extractFromGS1elementStrings(text)
@@ -183,7 +188,7 @@ export async function interpretScan(raw: string, format: string): Promise<ScanRe
   }
 
   const countries = await loadCountries()
-  const keys = Object.keys(parsed.values)
+  const keys = parsed.order ?? Object.keys(parsed.values)
   // Chiave primaria (GTIN, SSCC, GLN…) e i suoi qualificatori, poi gli altri AI nell'ordine del codice.
   const primaryAi = keys.find((ai) => ai in PRIMARY_KEYS)
   const qualifiers = primaryAi ? PRIMARY_KEYS[primaryAi].filter((ai) => ai in parsed.values) : []

@@ -17,7 +17,8 @@ const options: ReaderOptions = {
   tryRotate: true,
   tryInvert: true,
   textMode: 'HRI',
-  maxNumberOfSymbols: 1,
+  // Più barcode nella stessa immagine: un'etichetta logistica ha spesso 2–3 GS1-128 (vedi useScanner).
+  maxNumberOfSymbols: 8,
 }
 
 const post = (message: DecoderResponse) => self.postMessage(message)
@@ -28,21 +29,18 @@ self.onmessage = async ({ data }: MessageEvent<DecoderRequest>) => {
   try {
     await ready
     const input = data.type === 'frame' ? new ImageData(new Uint8ClampedArray(data.buffer), data.width, data.height) : data.blob
-    const [hit] = (await readBarcodes(input, options)).filter((result) => result.isValid && result.text)
-    post({
-      type: 'result',
-      id: data.id,
-      hit: hit
-        ? {
-            text: hit.text,
-            format: hit.format,
-            symbologyIdentifier: hit.symbologyIdentifier,
-            position: hit.position,
-            symbol: hit.symbol?.width ? { width: hit.symbol.width, height: hit.symbol.height, data: new Uint8ClampedArray(hit.symbol.data) } : undefined,
-          }
-        : null,
-    })
+    const seen = new Set<string>()
+    const hits = (await readBarcodes(input, options))
+      .filter((result) => result.isValid && result.text && !seen.has(result.text) && seen.add(result.text))
+      .map((hit) => ({
+        text: hit.text,
+        format: hit.format,
+        symbologyIdentifier: hit.symbologyIdentifier,
+        position: hit.position,
+        symbol: hit.symbol?.width ? { width: hit.symbol.width, height: hit.symbol.height, data: new Uint8ClampedArray(hit.symbol.data) } : undefined,
+      }))
+    post({ type: 'result', id: data.id, hits })
   } catch (error) {
-    post({ type: 'result', id: data.id, hit: null, error: String(error) })
+    post({ type: 'result', id: data.id, hits: [], error: String(error) })
   }
 }

@@ -19,4 +19,4 @@ export type DecoderRequest =
 export type DecoderResponse =
   | { type: 'ready' }
   | { type: 'error'; message: string }
-  | { type: 'result'; id: number; hit: Hit | null; error?: string }
+  | { type: 'result'; id: number; hits: Hit[]; error?: string }

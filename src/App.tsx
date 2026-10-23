@@ -12,10 +12,10 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { awaitsAnswer, combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { awaitsAnswer, combineMany, combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
-import { checkSyntax, loadSyntaxEngine } from './gs1/syntax'
+import { canCoexist, checkSyntax, loadSyntaxEngine } from './gs1/syntax'
 import { verifyKey } from './gs1/vbg'
 import { checkWebRisk } from './gs1/webRisk'
 import { decodeImage } from './scanner/decodeImage'
@@ -225,7 +225,9 @@ export default function App() {
    */
   const attach = useCallback(
     async (base: Scan, extra: Scan) => {
-      const joined = combineScans(base, extra)
+      const combined = combineScans(base, extra)
+      // AI che GS1 non ammette insieme (es. (01) e (02)): il barcode è di un altro articolo.
+      const joined: typeof combined = combined.ok && !(await canCoexist(combined.data)) ? { ok: false, reason: 'other-item' } : combined
       if (!joined.ok) {
         if (joined.reason === 'not-gs1') {
           setNotice(t('Il barcode letto non contiene dati GS1'))
@@ -321,20 +323,38 @@ export default function App() {
     if (scan) localize(scan)
   }, [lang, localize, scan])
 
+  /**
+   * Barcode letti insieme (fotocamera o foto): uno solo nella maggior parte dei casi; più di uno da
+   * un'etichetta logistica. I barcode GS1 compatibili diventano un unico articolo, letto da più barcode;
+   * quelli di altri articoli si scartano (e lo si dice). Senza dati GS1 vale il primo barcode.
+   */
+  const readHits = useCallback(async (hits: Hit[]): Promise<Scan> => {
+    const scans: Scan[] = await Promise.all(
+      hits.map(async (hit) => ({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) })),
+    )
+    // Etichetta logistica: i GS1-128 (i barcode dell'etichetta) vengono prima; gli altri barcode letti
+    // (es. l'EAN di un prodotto vicino) si aggiungono solo se compatibili con l'etichetta.
+    const labelFirst = (s: Scan) => (s.format === 'GS1-128' ? 0 : 1)
+    const gs1 = scans.filter((s) => s.kind === 'gs1').sort((a, b) => labelFirst(a) - labelFirst(b))
+    const joined = gs1.length > 1 ? await combineMany(gs1, canCoexist) : null
+    if (!joined) return gs1[0] ?? scans[0]
+    if (joined.skipped) setNotice(t('{n} barcode di altri articoli non considerati', { n: joined.skipped }))
+    const fresh = await interpretScan(joined.data, gs1[0].format)
+    return { ...fresh, format: gs1[0].format, barcodes: joined.barcodes }
+  }, [])
+
   const onRead = useCallback(
-    (hit: Hit, center: { x: number; y: number }) => {
+    (hits: Hit[], center: { x: number; y: number }) => {
       setReading(true)
       const started = performance.now()
-      void interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))
-        .then((interpreted) => {
-          const result = { ...interpreted, symbol: packSymbol(hit.symbol) }
-          window.setTimeout(() => {
-            show(result, center, 'camera')
-            setReading(false)
-          }, Math.max(0, LOCK_MS - (performance.now() - started)))
-        })
+      void readHits(hits).then((result) => {
+        window.setTimeout(() => {
+          show(result, center, 'camera')
+          setReading(false)
+        }, Math.max(0, LOCK_MS - (performance.now() - started)))
+      })
     },
-    [show],
+    [show, readHits],
   )
 
   const onIssue = useCallback((issue: CameraError | null) => {
@@ -389,12 +409,13 @@ export default function App() {
 
   async function readFile(file: File | undefined) {
     if (!file) return
-    const hit = await decodeImage(file)
-    if (!hit) {
+    const hits = await decodeImage(file)
+    if (!hits.length) {
       setNotice(t('Nessun codice trovato nella foto'))
       return
     }
-    show({ ...(await interpretScan(hit.text, formatName(hit.format, hit.symbologyIdentifier))), symbol: packSymbol(hit.symbol) }, undefined, 'image')
+    // Come con la fotocamera: più barcode solo da un'etichetta con GS1-128, altrimenti il primo.
+    show(await readHits(hits.some((h) => h.symbologyIdentifier === ']C1') ? hits : hits.slice(0, 1)), undefined, 'image')
   }
 
   function openFromHistory(stored: Scan) {

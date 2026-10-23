@@ -141,6 +141,32 @@ export async function checkSyntax(scan: ScanResult): Promise<SyntaxCheck | null>
   return { ok: true, ...extra }
 }
 
+/**
+ * I dati di più barcode possono stare sullo stesso articolo? No se la GS1 Barcode Syntax Engine trova
+ * una coppia di AI vietata (es. (01) con (02)) o lo stesso AI con valori diversi: quel barcode è di
+ * un altro articolo. Gli AI obbligatori mancanti non contano (possono stare in un altro barcode); un
+ * valore non valido in un singolo AI nemmeno (lo segnala poi il controllo di sintassi). Senza engine: sì.
+ */
+export async function canCoexist(data: string): Promise<boolean> {
+  let engine: Encoder
+  try {
+    engine = await loadSyntaxEngine()
+  } catch {
+    return true
+  }
+  try {
+    engine.aiDataStr = data
+    return true
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/invalid to pair|Multiple instances/i.test(message)) return false
+    if (!missingFromEngine(message)) return true
+    // AI mancante: l'engine si ferma prima di controllare i valori ripetuti, quindi si ricontrolla senza associazioni.
+    const failure = withoutAssociations(engine, { ai: data })
+    return !failure || !/Multiple instances/i.test(failure.original)
+  }
+}
+
 /** Ricontrollo senza le associazioni tra AI: null se i dati sono validi, altrimenti l'errore. */
 function withoutAssociations(engine: Encoder, data: EngineInput): { original: string; markup?: string } | null {
   try {

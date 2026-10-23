@@ -60,8 +60,37 @@ export function combineScans(base: Scan, extra: Scan): Combination {
   }
   // Parentesi nei valori: si proteggono come previsto dalla sintassi con parentesi.
   const data = [...values].map(([ai, value]) => `(${ai})${value.replace(/\(/g, '\\(')}`).join('')
-  const barcodes = [...(base.barcodes ?? [{ format: base.format, raw: base.raw, ais: aisOf(base) }]), { format: extra.format, raw: extra.raw, ais: aisOf(extra) }]
+  const barcodes = [...barcodesOf(base), ...barcodesOf(extra)]
   return { ok: true, data, barcodes }
+}
+
+/** Barcode di una scansione: quelli già uniti, oppure lei stessa. */
+const barcodesOf = (scan: Scan): Barcode[] => scan.barcodes ?? [{ format: scan.format, raw: scan.raw, ais: aisOf(scan) }]
+
+/**
+ * Più barcode letti insieme (etichetta logistica): si uniscono nell'ordine di lettura quelli compatibili
+ * con i precedenti; quelli di un altro articolo, con valori in conflitto o con AI che GS1 non ammette
+ * insieme (coexist, vedi canCoexist) si scartano e si contano.
+ * null se resta un solo barcode.
+ */
+export async function combineMany(scans: Scan[], coexist: (data: string) => Promise<boolean> = async () => true): Promise<{ data: string; barcodes: Barcode[]; skipped: number } | null> {
+  const [first, ...rest] = scans
+  if (!first) return null
+  let acc: Scan = first
+  let data = ''
+  let skipped = 0
+  for (const extra of rest) {
+    const joined = combineScans(acc, extra)
+    if (!joined.ok || !(await coexist(joined.data))) {
+      skipped += 1
+      continue
+    }
+    data = joined.data
+    // Si prosegue con i soli AI e valori: bastano a combineScans per i confronti successivi.
+    const fields = [...(acc.primary ? [acc.primary] : []), ...acc.fields, ...(extra.primary ? [extra.primary] : []), ...extra.fields]
+    acc = { ...acc, primary: undefined, fields, barcodes: joined.barcodes }
+  }
+  return acc.barcodes && acc.barcodes.length > 1 ? { data, barcodes: acc.barcodes, skipped } : null
 }
 
 export function needsVerification(scan: Scan) {

@@ -378,5 +378,7 @@
   "L’utente ha indicato che non c’è": "The user indicated there isn’t one",
   "Dati letti da {n} barcode": "Data read from {n} barcodes",
   "Barcode {i} · {format}": "Barcode {i} · {format}",
-  "Barcode {i}": "Barcode {i}"
+  "Barcode {i}": "Barcode {i}",
+  "{n} barcode di altri articoli non considerati": "{n} barcodes of other items not included",
+  "1 dato": "1 data item"
 }

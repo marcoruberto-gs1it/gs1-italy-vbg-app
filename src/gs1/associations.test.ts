@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { _setLangForTest } from '../i18n'
-import { combineScans, fieldsByBarcode, type Scan } from '../components/scan'
+import { combineMany, combineScans, fieldsByBarcode, type Scan } from '../components/scan'
 import { assocOutcome } from '../analytics/events'
 import { valueAssociations } from './associations'
 import { interpretScan } from './interpret'
-import { checkSyntax } from './syntax'
+import { canCoexist, checkSyntax } from './syntax'
 
 const cd = (body: string) => {
   let sum = 0
@@ -65,13 +65,13 @@ describe('dati su più barcode dello stesso articolo', () => {
   const scan = async (data: string, format = 'GS1-128') => (await interpretScan(data, format)) as Scan
   it('unisce i dati e li ricontrolla insieme', async () => {
     const joined = combineScans(await scan(`(01)${VAR}(10)L1`), await scan(`(3103)001250(15)261231`))
-    expect(joined).toMatchObject({ ok: true, data: `(01)${VAR}(10)L1(15)261231(3103)001250` })
+    expect(joined).toMatchObject({ ok: true, data: `(01)${VAR}(10)L1(3103)001250(15)261231` })
     if (!joined.ok) return
-    expect(joined.barcodes.map((b) => b.ais)).toEqual([['01', '10'], ['15', '3103']])
+    expect(joined.barcodes.map((b) => b.ais)).toEqual([['01', '10'], ['3103', '15']])
     const merged = await scan(joined.data)
     expect((await checkSyntax(merged))?.notices).toBeUndefined()
     const groups = fieldsByBarcode({ ...merged, barcodes: joined.barcodes })
-    expect(groups?.map((g) => g.fields.map((f) => `${f.ai}=${f.value}`))).toEqual([[`01=${VAR}`, '10=L1'], ['15=261231', '3103=001250']])
+    expect(groups?.map((g) => g.fields.map((f) => `${f.ai}=${f.value}`))).toEqual([[`01=${VAR}`, '10=L1'], ['3103=001250', '15=261231']])
   })
   it('riconosce un altro articolo e i valori in conflitto', async () => {
     expect(combineScans(await scan(`(01)${VAR}`), await scan(`(01)${ITEM}`))).toMatchObject({ ok: false, reason: 'other-item' })
@@ -100,5 +100,35 @@ describe('esito per le statistiche', () => {
     const merged = { ...(await base(`(01)${VAR}(3103)001250`)), barcodes: [{ format: 'GS1-128', raw: 'a' }, { format: 'GS1-128', raw: 'b' }] }
     expect(assocOutcome(merged)).toBe('completed')
     expect(assocOutcome(await base(`(01)${ITEM}`))).toBeNull()
+  })
+})
+
+describe('barcode letti insieme (etichetta logistica)', () => {
+  const scan = async (data: string, format = 'GS1-128') => (await interpretScan(data, format)) as Scan
+  it('unisce i barcode compatibili e scarta quelli di altri articoli', async () => {
+    const label = [
+      await scan('(00)095060001343520000'),
+      await scan(`(02)${ITEM}(37)24`),
+      await scan('(10)LOT7(15)271231'),
+      await scan('(01)08076802085738', 'EAN-13'), // un altro prodotto nell'inquadratura: ha (01), ma non va con (02)…
+    ]
+    const joined = await combineMany(label, canCoexist)
+    expect(joined?.barcodes.map((b) => b.ais)).toEqual([['00'], ['02', '37'], ['10', '15']])
+    expect(joined?.skipped).toBe(1)
+    const merged = await scan(joined!.data)
+    expect([merged.primary?.ai, ...merged.fields.map((f) => f.ai)]).toEqual(['00', '02', '37', '10', '15'])
+  })
+  it('scarta un barcode con la stessa chiave ma valore diverso', async () => {
+    const joined = await combineMany([await scan(`(01)${VAR}(10)A`), await scan('(3103)001250'), await scan(`(01)${ITEM}`, 'EAN-13')], canCoexist)
+    expect([joined?.barcodes.length, joined?.skipped]).toEqual([2, 1])
+  })
+  it('compatibilità secondo le regole GS1', async () => {
+    expect(await canCoexist(`(00)095060001343520000(02)${ITEM}(37)24`)).toBe(true)
+    expect(await canCoexist(`(02)${ITEM}(37)24(01)${ITEM}`)).toBe(false) // (01) e (02) non vanno insieme
+    expect(await canCoexist('(10)A(10)B')).toBe(false)
+    expect(await canCoexist('(10)A(17)251340')).toBe(true) // data errata: lo dice il controllo di sintassi
+  })
+  it('nessuna unione con un solo barcode', async () => {
+    expect(await combineMany([await scan(`(01)${ITEM}`)])).toBeNull()
   })
 })

@@ -19,13 +19,23 @@ const cameraMessages: Record<CameraError, [string, string]> = {
 
 type Props = {
   paused: boolean
-  onRead: (hit: Hit, center: { x: number; y: number }) => void
+  /** Barcode letti: più di uno quando l'inquadratura contiene un'etichetta logistica (GS1-128). */
+  onRead: (hits: Hit[], center: { x: number; y: number }) => void
   onClose: () => void
   onManual: () => void
   onImage: () => void
   onIssue: (issue: CameraError | null) => void
   /** Indicazione in alto (es. quando si legge l'altro barcode di un articolo). */
   hint?: string
+}
+
+/** Rettangolo che contiene tutti i quadrilateri. */
+function enclosing(quads: Quad[]): Quad {
+  const points = quads.flatMap((q) => [q.topLeft, q.topRight, q.bottomRight, q.bottomLeft])
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  return { topLeft: { x: left, y: top }, topRight: { x: right, y: top }, bottomRight: { x: right, y: bottom }, bottomLeft: { x: left, y: bottom } }
 }
 
 function quadStyle(q: Quad, linear: boolean): CSSProperties {
@@ -45,13 +55,15 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
   const [lock, setLock] = useState<{ quad: Quad; linear: boolean } | null>(null)
 
   const onDetect = useCallback(
-    (hit: Hit, quad: Quad) => {
-      setLock({ quad, linear: !/QR|Matrix|Aztec|PDF417|MaxiCode/i.test(hit.format) })
-      navigator.vibrate?.(35)
+    (hits: Hit[], quads: Quad[]) => {
+      // Il mirino si aggancia all'area che contiene tutti i barcode letti.
+      const quad = quads.length === 1 ? quads[0] : enclosing(quads)
+      setLock({ quad, linear: hits.length > 1 || !/QR|Matrix|Aztec|PDF417|MaxiCode/i.test(hits[0].format) })
+      navigator.vibrate?.(hits.length > 1 ? [35, 60, 35] : 35)
       const rect = videoRef.current?.getBoundingClientRect()
       const cx = (quad.topLeft.x + quad.topRight.x + quad.bottomRight.x + quad.bottomLeft.x) / 4
       const cy = (quad.topLeft.y + quad.topRight.y + quad.bottomRight.y + quad.bottomLeft.y) / 4
-      onRead(hit, { x: cx + (rect?.left ?? 0), y: cy + (rect?.top ?? 0) })
+      onRead(hits, { x: cx + (rect?.left ?? 0), y: cy + (rect?.top ?? 0) })
     },
     [onRead],
   )
