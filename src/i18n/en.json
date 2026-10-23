@@ -375,5 +375,8 @@
   "No, non c’è": "No, there isn’t",
   "Hai indicato che non c’è un altro barcode: all’articolo mancano dati obbligatori.": "You indicated there is no other barcode: the item is missing mandatory data.",
   "Altro barcode": "Other barcode",
-  "L’utente ha indicato che non c’è": "The user indicated there isn’t one"
+  "L’utente ha indicato che non c’è": "The user indicated there isn’t one",
+  "Dati letti da {n} barcode": "Data read from {n} barcodes",
+  "Barcode {i} · {format}": "Barcode {i} · {format}",
+  "Barcode {i}": "Barcode {i}"
 }

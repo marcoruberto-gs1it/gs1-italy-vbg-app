@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { _setLangForTest } from '../i18n'
-import { combineScans, type Scan } from '../components/scan'
+import { combineScans, fieldsByBarcode, type Scan } from '../components/scan'
 import { assocOutcome } from '../analytics/events'
 import { valueAssociations } from './associations'
 import { interpretScan } from './interpret'
@@ -67,9 +67,11 @@ describe('dati su più barcode dello stesso articolo', () => {
     const joined = combineScans(await scan(`(01)${VAR}(10)L1`), await scan(`(3103)001250(15)261231`))
     expect(joined).toMatchObject({ ok: true, data: `(01)${VAR}(10)L1(15)261231(3103)001250` })
     if (!joined.ok) return
-    expect(joined.barcodes).toHaveLength(2)
+    expect(joined.barcodes.map((b) => b.ais)).toEqual([['01', '10'], ['15', '3103']])
     const merged = await scan(joined.data)
     expect((await checkSyntax(merged))?.notices).toBeUndefined()
+    const groups = fieldsByBarcode({ ...merged, barcodes: joined.barcodes })
+    expect(groups?.map((g) => g.fields.map((f) => `${f.ai}=${f.value}`))).toEqual([[`01=${VAR}`, '10=L1'], ['15=261231', '3103=001250']])
   })
   it('riconosce un altro articolo e i valori in conflitto', async () => {
     expect(combineScans(await scan(`(01)${VAR}`), await scan(`(01)${ITEM}`))).toMatchObject({ ok: false, reason: 'other-item' })

@@ -9,7 +9,7 @@ import type { WebRiskResult } from '../gs1/webRisk'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
-import { codeType, formatKind, gs1Compliance, missingNotices, titleOf, type Scan } from './scan'
+import { codeType, fieldsByBarcode, formatKind, gs1Compliance, missingNotices, titleOf, type Scan } from './scan'
 import { Symbol2D } from './symbol'
 import { t } from '../i18n'
 import { formatLabel } from '../lib/display'
@@ -161,6 +161,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
     ...(vbg?.updated ? [[t('Ultimo aggiornamento'), vbg.updated] as [string, string]] : []),
   ]
   const notes = Object.fromEntries(scan.fields.map((f) => [f.ai, f]))
+  // Articolo letto da più barcode: tutti i dati letti, raggruppati per barcode.
+  const byBarcode = fieldsByBarcode(scan)
 
   return (
     <section className="result" ref={scope} aria-label={t('Esito della scansione')}>
@@ -266,11 +268,31 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 
-        {details.length > 0 && (
+        {byBarcode && (
+          <div className="vbg-reveal">
+            <h2 className="section-label">{t('Dati letti da {n} barcode', { n: byBarcode.length })}</h2>
+            {byBarcode.map(({ barcode, fields }, i) => (
+              <section key={i} className="result-card fields barcode-group" aria-label={t('Barcode {i} · {format}', { i: i + 1, format: formatLabel(barcode.format) })}>
+                <header className="barcode-head">
+                  <span className="barcode-index" aria-hidden="true">{i + 1}</span>
+                  <span>
+                    <strong>{t('Barcode {i}', { i: i + 1 })}</strong>
+                    <small>{formatLabel(barcode.format)} · {t('{n} dati', { n: fields.length })}</small>
+                  </span>
+                </header>
+                <dl>
+                  {fields.map((f) => <Row key={f.ai} label={f.label} ai={f.ai} value={f.display} note={f.note} tone={f.tone} />)}
+                </dl>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {(byBarcode ? details.filter(([, , ai]) => !ai) : details).length > 0 && (
           <div className="vbg-reveal">
             <h2 className="section-label">{t('Dettagli')}</h2>
             <dl className="result-card fields">
-              {details.map(([label, value, ai]) => {
+              {(byBarcode ? details.filter(([, , ai]) => !ai) : details).map(([label, value, ai]) => {
                 const field = ai ? notes[ai] : undefined
                 return <Row key={`${label}-${ai ?? ''}`} label={label} ai={ai} value={value} note={field?.note} tone={field?.tone} />
               })}

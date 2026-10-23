@@ -13,7 +13,7 @@ export type Scan = ScanResult & {
   syntax?: SyntaxCheck | null
   webRisk?: WebRiskResult
   /** Barcode letti per questo articolo, quando i dati sono su più barcode (es. etichetta logistica). */
-  barcodes?: { format: string; raw: string }[]
+  barcodes?: Barcode[]
   /** Risposta dell'utente alla domanda sull'altro barcode: declined = "non c'è". */
   assoc?: 'declined'
 }
@@ -23,6 +23,21 @@ export const missingNotices = (scan: Scan) => (scan.syntax?.notices ?? []).filte
 
 /** In attesa che l'utente dica se c'è un altro barcode (la statistica parte dopo la risposta o alla chiusura). */
 export const awaitsAnswer = (scan: Scan) => missingNotices(scan).length > 0 && !scan.assoc
+
+/** Un barcode letto: simbologia, contenuto e AI che conteneva (ais assente nelle scansioni salvate prima della 1.4.1). */
+export type Barcode = { format: string; raw: string; ais?: string[] }
+
+const aisOf = (scan: Scan) => [...(scan.primary ? [scan.primary] : []), ...scan.fields].map((f) => f.ai)
+
+/**
+ * Dati dell'articolo raggruppati per barcode letto, nell'ordine di lettura. Un AI presente in più
+ * barcode (stesso valore) compare in ciascun gruppo. null se l'articolo è stato letto da un solo barcode.
+ */
+export function fieldsByBarcode(scan: Scan) {
+  if (!scan.barcodes || scan.barcodes.some((b) => !b.ais)) return null
+  const all = [...(scan.primary ? [scan.primary] : []), ...scan.fields]
+  return scan.barcodes.map((barcode) => ({ barcode, fields: barcode.ais!.map((ai) => all.find((f) => f.ai === ai)).filter((f) => f !== undefined) }))
+}
 
 export type Combination =
   | { ok: true; data: string; barcodes: NonNullable<Scan['barcodes']> }
@@ -45,7 +60,7 @@ export function combineScans(base: Scan, extra: Scan): Combination {
   }
   // Parentesi nei valori: si proteggono come previsto dalla sintassi con parentesi.
   const data = [...values].map(([ai, value]) => `(${ai})${value.replace(/\(/g, '\\(')}`).join('')
-  const barcodes = [...(base.barcodes ?? [{ format: base.format, raw: base.raw }]), { format: extra.format, raw: extra.raw }]
+  const barcodes = [...(base.barcodes ?? [{ format: base.format, raw: base.raw, ais: aisOf(base) }]), { format: extra.format, raw: extra.raw, ais: aisOf(extra) }]
   return { ok: true, data, barcodes }
 }
 

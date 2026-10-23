@@ -6,7 +6,8 @@
 import { jsPDF } from 'jspdf'
 import logoUrl from '../assets/gs1-italy-logo.png'
 import { encodeEan } from '../components/ean'
-import { codeType, gs1Compliance, titleOf, type Scan } from '../components/scan'
+import { codeType, fieldsByBarcode, gs1Compliance, titleOf, type Scan } from '../components/scan'
+import type { Field } from '../gs1/interpret'
 import { isDark } from '../components/symbolData'
 import { assessLink, registrableDomain } from '../gs1/linkSafety'
 import { canVerify } from '../gs1/vbg'
@@ -222,8 +223,16 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   // Dati codificati
   if (scan.kind === 'gs1') {
     w.section(t('Dati codificati'))
-    for (const f of [...(scan.primary ? [scan.primary] : []), ...scan.fields]) {
-      w.row(`${f.label} (${f.ai})`, f.note ? `${f.display} — ${f.note}` : f.display)
+    const fieldRow = (f: Field) => w.row(`${f.label} (${f.ai})`, f.note ? `${f.display} — ${f.note}` : f.display)
+    const groups = fieldsByBarcode(scan)
+    if (groups) {
+      // Articolo letto da più barcode: i dati di ciascun barcode, nell'ordine di lettura.
+      groups.forEach(({ barcode, fields }, i) => {
+        w.paragraph(`${t('Barcode {i}', { i: i + 1 })} · ${formatLabel(barcode.format)}`, { size: 10, bold: true, color: NAVY })
+        fields.forEach(fieldRow)
+      })
+    } else {
+      for (const f of [...(scan.primary ? [scan.primary] : []), ...scan.fields]) fieldRow(f)
     }
     if (scan.checkDigit !== undefined) w.row(t('Cifra di controllo'), scan.checkDigit ? t('Corretta') : t('Errata'), { mark: scan.checkDigit ? 'ok' : 'bad' })
     if (scan.digitalLink) w.row('GS1 Digital Link', scan.digitalLink, { mono: true })
