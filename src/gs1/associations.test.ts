@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { _setLangForTest } from '../i18n'
 import { combineScans, type Scan } from '../components/scan'
+import { assocOutcome } from '../analytics/events'
 import { valueAssociations } from './associations'
 import { interpretScan } from './interpret'
 import { checkSyntax } from './syntax'
@@ -75,8 +76,27 @@ describe('dati su più barcode dello stesso articolo', () => {
     expect(combineScans(await scan(`(01)${VAR}(10)A`), await scan('(10)B(3103)001250'))).toMatchObject({ ok: false, reason: 'different-values', ai: '10' })
     expect(combineScans(await scan(`(01)${VAR}`), await scan('https://example.com', 'QR Code'))).toMatchObject({ ok: false, reason: 'not-gs1' })
   })
+  it('unisce SSCC e GTIN di barcode diversi (collo che è anche unità commerciale)', async () => {
+    const joined = combineScans(await scan('(00)095060001343520000'), await scan(`(01)${ITEM}(10)L1`))
+    expect(joined).toMatchObject({ ok: true })
+  })
   it('protegge le parentesi nei valori', async () => {
     const joined = combineScans(await scan(`(01)${VAR}`), await scan('(10)A\\(1'))
     expect(joined).toMatchObject({ ok: true, data: `(01)${VAR}(10)A\\(1` })
+  })
+})
+
+describe('esito per le statistiche', () => {
+  const base = async (data: string) => {
+    const s = (await interpretScan(data, 'GS1-128')) as Scan
+    return { ...s, syntax: await checkSyntax(s) } as Scan
+  }
+  it('distingue senza risposta, confermato, completato e domanda non necessaria', async () => {
+    const incomplete = await base(`(01)${VAR}`)
+    expect(assocOutcome(incomplete)).toBe('unanswered')
+    expect(assocOutcome({ ...incomplete, assoc: 'declined' })).toBe('declined')
+    const merged = { ...(await base(`(01)${VAR}(3103)001250`)), barcodes: [{ format: 'GS1-128', raw: 'a' }, { format: 'GS1-128', raw: 'b' }] }
+    expect(assocOutcome(merged)).toBe('completed')
+    expect(assocOutcome(await base(`(01)${ITEM}`))).toBeNull()
   })
 })

@@ -18,7 +18,15 @@ export type AssociationNotice = {
   kind: 'missing' | 'mismatch'
   /** AI che fa scattare la regola. */
   ai: string
+  /**
+   * Codice stabile per le statistiche, indipendente dalla lingua: regola:AI. missing (dal GS1 Barcode
+   * Syntax Dictionary), variable-measure (GTIN con indicatore 9), mto-gtin (242), fixed-gtin (dati di peso
+   * variabile con GTIN di imballo).
+   */
+  code: string
   message: string
+  /** Solo per missing: che cosa cercare nell'altro barcode, in breve. */
+  needs?: string
 }
 
 /** Misure commerciali (§3.6.2, "3nnn*" della tabella): 31nn, 32nn e le 35nn/36nn non logistiche. */
@@ -47,6 +55,8 @@ export function valueAssociations(values: Record<string, string>): AssociationNo
       notices.push({
         kind: 'missing',
         ai,
+        code: `variable-measure:${ai}`,
+        needs: t('il peso o un’altra misura, la quantità variabile (30), le dimensioni del rotolo (8001) o la variante su ordinazione (242)'),
         message: t('GTIN di un prodotto a peso variabile (indicatore 9): va insieme alla quantità variabile (30), a una misura commerciale (31nn, 32nn, 35nn, 36nn) o alle dimensioni del rotolo (8001). Se è un prodotto su ordinazione, va insieme al numero di variante (242).'),
       })
     }
@@ -56,7 +66,7 @@ export function valueAssociations(values: Record<string, string>): AssociationNo
   if ('242' in values) {
     const keys = ['01', '02', '8006', '8026'].filter((ai) => ai in values)
     if (keys.length && !keys.some((ai) => indicator(ai, values[ai]) === '9')) {
-      notices.push({ kind: 'mismatch', ai: '242', message: t('Il numero di variante su ordinazione (242) va usato con un GTIN con indicatore 9, che identifica un prodotto su ordinazione.') })
+      notices.push({ kind: 'mismatch', ai: '242', code: 'mto-gtin:242', message: t('Il numero di variante su ordinazione (242) va usato con un GTIN con indicatore 9, che identifica un prodotto su ordinazione.') })
     }
   }
 
@@ -70,6 +80,7 @@ export function valueAssociations(values: Record<string, string>): AssociationNo
       notices.push({
         kind: 'mismatch',
         ai,
+        code: `fixed-gtin:${ai}`,
         message: t('«{name}» ({ai}) riguarda prodotti a peso variabile, ma il GTIN ({gtin}) ha indicatore {n}, che identifica un imballo a quantità fissa: per il peso variabile l’indicatore è 9.', { name: aiLabel(ai), ai, gtin, n }),
       })
     }
@@ -93,9 +104,12 @@ export function missingFromEngine(message: string): AssociationNotice | null {
   const m = message.match(/Required AIs for AI \((\d{2,4})\) are not satisfied: ([\dn,+ ]+)/i)
   if (!m) return null
   const options = m[2].split(',').map((s) => s.trim()).filter(Boolean)
+  const list = options.map(requirementText).join(` ${t('oppure')} `)
   return {
     kind: 'missing',
     ai: m[1],
-    message: t('«{name}» ({ai}) va insieme a: {list}.', { name: aiLabel(m[1]), ai: m[1], list: options.map(requirementText).join(` ${t('oppure')} `) }),
+    code: `missing:${m[1]}`,
+    needs: list,
+    message: t('«{name}» ({ai}) va insieme a: {list}.', { name: aiLabel(m[1]), ai: m[1], list }),
   }
 }

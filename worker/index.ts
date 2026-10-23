@@ -97,6 +97,7 @@ const EVENT_FIELDS: Record<string, FieldRule> = {
   symbology: 40, is_2d: 'bool', content_kind: 10, compliance: 10,
   check_digit_ok: 'bool', syntax_ok: 'bool', syntax_error: 300,
   primary_ai: 4, primary_key: 90, ai_list: 'strings', issuer_mo: 120,
+  barcode_count: 'int', assoc_notices: 'strings', assoc_outcome: 12,
   vbg_state: 10, vbg_complete: 'bool', vbg_core_count: 'int', vbg_error_code: 10,
   company_prefix: 20, licensee_name: 200, brand_name: 120, vbg_record_status: 30, vbg_licence_status: 30, licensee_gln: 13, licensing_mo: 80,
   gpc_brick: 10, gpc_brick_name: 200, gpc_segment: 200,

@@ -352,8 +352,6 @@
   "Il barcode letto non contiene dati GS1": "The barcode read contains no GS1 data",
   "Inquadra l’altro barcode dello stesso articolo": "Point at the other barcode of the same item",
   "È un altro articolo: aperto come nuova scansione": "It is a different item: opened as a new scan",
-  "Leggi l’altro barcode": "Read the other barcode",
-  "Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo, per esempio su un’etichetta logistica con più GS1-128. Leggilo per controllare l’articolo completo.": "Under GS1 rules this data may be in another barcode on the same item, for example on a logistic label with several GS1-128 barcodes. Read it to check the complete item.",
   "Regole: GS1 General Specifications, associazioni obbligatorie (§4.13.2).": "Rules: GS1 General Specifications, mandatory association of element strings (§4.13.2).",
   "{n} barcode": "{n} barcodes",
   "GTIN di un prodotto a peso variabile (indicatore 9): va insieme alla quantità variabile (30), a una misura commerciale (31nn, 32nn, 35nn, 36nn) o alle dimensioni del rotolo (8001). Se è un prodotto su ordinazione, va insieme al numero di variante (242).": "GTIN of a variable measure trade item (indicator 9): it must be used with a variable count (30), a trade measure (31nn, 32nn, 35nn, 36nn) or roll product dimensions (8001). If it is a custom trade item, it must be used with the Made-to-Order variation number (242).",
@@ -369,5 +367,13 @@
   "Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo (GS1 General Specifications §4.13.2).": "Under GS1 rules this data may be in another barcode on the same item (GS1 General Specifications §4.13.2).",
   "Rispettate · GS1 General Specifications §4.13.2": "Satisfied · GS1 General Specifications §4.13.2",
   "{n} avvisi · GS1 General Specifications §4.13.2": "{n} warnings · GS1 General Specifications §4.13.2",
-  "Prodotto a peso variabile": "Variable measure trade item"
+  "Prodotto a peso variabile": "Variable measure trade item",
+  "il peso o un’altra misura, la quantità variabile (30), le dimensioni del rotolo (8001) o la variante su ordinazione (242)": "the weight or another measure, the variable count (30), the roll dimensions (8001) or the Made-to-Order variation number (242)",
+  "C’è un altro barcode su questo articolo?": "Is there another barcode on this item?",
+  "Cerca un barcode con: {needs}. Per GS1 questi dati possono stare in un altro barcode dello stesso articolo, per esempio su un’etichetta logistica con più GS1-128.": "Look for a barcode with: {needs}. Under GS1 rules this data may be in another barcode on the same item, for example on a logistic label with several GS1-128 barcodes.",
+  "Sì, leggilo": "Yes, read it",
+  "No, non c’è": "No, there isn’t",
+  "Hai indicato che non c’è un altro barcode: all’articolo mancano dati obbligatori.": "You indicated there is no other barcode: the item is missing mandatory data.",
+  "Altro barcode": "Other barcode",
+  "L’utente ha indicato che non c’è": "The user indicated there isn’t one"
 }

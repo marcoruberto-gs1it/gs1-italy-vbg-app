@@ -1,4 +1,5 @@
 import type { ScanResult } from '../gs1/interpret'
+import { PRIMARY_KEYS } from '../gs1/aiDictionary'
 import { canVerify, type Verification } from '../gs1/vbg'
 import type { SyntaxCheck } from '../gs1/syntax'
 import type { WebRiskResult } from '../gs1/webRisk'
@@ -13,7 +14,15 @@ export type Scan = ScanResult & {
   webRisk?: WebRiskResult
   /** Barcode letti per questo articolo, quando i dati sono su più barcode (es. etichetta logistica). */
   barcodes?: { format: string; raw: string }[]
+  /** Risposta dell'utente alla domanda sull'altro barcode: declined = "non c'è". */
+  assoc?: 'declined'
 }
+
+/** Avvisi su dati mancanti che potrebbero stare in un altro barcode dell'articolo. */
+export const missingNotices = (scan: Scan) => (scan.syntax?.notices ?? []).filter((n) => n.kind === 'missing')
+
+/** In attesa che l'utente dica se c'è un altro barcode (la statistica parte dopo la risposta o alla chiusura). */
+export const awaitsAnswer = (scan: Scan) => missingNotices(scan).length > 0 && !scan.assoc
 
 export type Combination =
   | { ok: true; data: string; barcodes: NonNullable<Scan['barcodes']> }
@@ -21,17 +30,17 @@ export type Combination =
 
 /**
  * Unisce i dati di un secondo barcode dello stesso articolo (GS1 General Specifications §4.13.2: gli AI
- * associati possono stare in barcode diversi). È un altro articolo se la chiave primaria è diversa;
- * lo stesso AI con valori diversi non è ammesso. data: element string con tutti gli AI, da reinterpretare.
+ * associati possono stare in barcode diversi). Chiavi diverse possono convivere (es. SSCC e GTIN
+ * sull'etichetta di un collo che è anche un'unità commerciale); lo stesso AI con valori diversi no:
+ * se è una chiave (GTIN, SSCC…) è un altro articolo. data: element string con tutti gli AI, da reinterpretare.
  */
 export function combineScans(base: Scan, extra: Scan): Combination {
   if (extra.kind !== 'gs1') return { ok: false, reason: 'not-gs1' }
-  if (base.primary && extra.primary && (base.primary.ai !== extra.primary.ai || base.primary.value !== extra.primary.value)) return { ok: false, reason: 'other-item' }
   const values = new Map<string, string>()
   for (const field of [base.primary, ...base.fields, extra.primary, ...extra.fields]) {
     if (!field) continue
     const known = values.get(field.ai)
-    if (known !== undefined && known !== field.value) return { ok: false, reason: 'different-values', ai: field.ai }
+    if (known !== undefined && known !== field.value) return { ok: false, reason: field.ai in PRIMARY_KEYS ? 'other-item' : 'different-values', ai: field.ai }
     values.set(field.ai, field.value)
   }
   // Parentesi nei valori: si proteggono come previsto dalla sintassi con parentesi.

@@ -12,7 +12,7 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { awaitsAnswer, combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { checkSyntax, loadSyntaxEngine } from './gs1/syntax'
@@ -75,6 +75,8 @@ export default function App() {
   const companionRef = useRef<Scan | null>(null)
   // Statistiche: scansioni nuove in attesa che tutti i controlli asincroni siano arrivati.
   const pendingEvents = useRef(new Map<string, ScanSource>())
+  // Scansioni chiuse dall'utente (risultato chiuso o sostituito): la statistica non aspetta più la risposta.
+  const closedEvents = useRef(new Set<string>())
   const historyRef = useRef(history)
   // Lingua corrente: al cambio si ridisegna tutta l'interfaccia (i testi si calcolano a ogni rendering).
   const lang = useLang()
@@ -92,18 +94,66 @@ export default function App() {
     }
   }, [history])
 
-  // Invia l'evento appena la scansione è completa (sintassi, VbG, siti malevoli).
+  /*
+   * Statistiche: un solo evento per articolo, quando è "chiuso". Cioè quando sono arrivati i controlli
+   * (sintassi, VbG, siti malevoli) e non c'è una domanda in sospeso sull'altro barcode: l'utente ha
+   * risposto, ha letto l'altro barcode, oppure ha chiuso il risultato (o l'app va in background).
+   */
+  const dispatch = useCallback((id: string) => {
+    const source = pendingEvents.current.get(id)
+    const item = historyRef.current.find((h) => h.id === id)
+    pendingEvents.current.delete(id)
+    closedEvents.current.delete(id)
+    if (source && item) sendEvent(item, source)
+  }, [])
+
+  const ready = (item: Scan) => isSettled(item) && (!awaitsAnswer(item) || closedEvents.current.has(item.id))
+
   useEffect(() => {
     historyRef.current = history
-    for (const [id, source] of pendingEvents.current) {
+    for (const id of [...pendingEvents.current.keys()]) {
       const item = history.find((h) => h.id === id)
       if (!item) pendingEvents.current.delete(id)
-      else if (isSettled(item)) {
-        pendingEvents.current.delete(id)
-        sendEvent(item, source)
-      }
+      else if (ready(item)) dispatch(id)
     }
-  }, [history])
+  }, [history, dispatch])
+
+  /** L'utente ha lasciato la scansione: si invia appena i controlli sono arrivati, senza più aspettare la risposta. */
+  const closeEvent = useCallback(
+    (id: string) => {
+      if (!pendingEvents.current.has(id)) return
+      closedEvents.current.add(id)
+      const item = historyRef.current.find((h) => h.id === id)
+      if (item && isSettled(item)) dispatch(id)
+    },
+    [dispatch],
+  )
+
+  // App in background o chiusa: si invia tutto ciò che è in sospeso (ultimo momento affidabile sui telefoni).
+  // Si aspetta solo la scansione di cui si sta leggendo l'altro barcode (la fotocamera o la scelta di una
+  // foto possono mandare l'app in background), salvo quando la pagina viene chiusa davvero.
+  useEffect(() => {
+    const flush = (closing: boolean) => {
+      for (const id of [...pendingEvents.current.keys()]) if (closing || companionRef.current?.id !== id) dispatch(id)
+    }
+    const onHidden = () => document.visibilityState === 'hidden' && flush(false)
+    const onPageHide = () => flush(true)
+    document.addEventListener('visibilitychange', onHidden)
+    window.addEventListener('pagehide', onPageHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden)
+      window.removeEventListener('pagehide', onPageHide)
+    }
+  }, [dispatch])
+
+  // Il risultato mostrato cambia (chiuso, nuova scansione, altra voce della cronologia): la scansione
+  // precedente è chiusa. Non durante la lettura dell'altro barcode, che poi torna allo stesso risultato.
+  const shownId = useRef<string | null>(null)
+  useEffect(() => {
+    const previous = shownId.current
+    shownId.current = scan?.id ?? null
+    if (previous && previous !== scan?.id && companionRef.current?.id !== previous) closeEvent(previous)
+  }, [scan?.id, closeEvent])
 
   useEffect(() => {
     if (!notice) return
@@ -182,6 +232,8 @@ export default function App() {
           setScan(base)
           return true
         }
+        // Il barcode non completa l'articolo di partenza: quell'articolo è chiuso, il nuovo si apre a parte.
+        closeEvent(base.id)
         setNotice(joined.reason === 'other-item'
           ? t('È un altro articolo: aperto come nuova scansione')
           : t('I due barcode hanno valori diversi per l’AI ({ai}): aperto come nuova scansione', { ai: joined.ai ?? '' }))
@@ -207,20 +259,21 @@ export default function App() {
       lint(merged)
       return true
     },
-    [verify, lint],
+    [verify, lint, closeEvent],
   )
 
   const present = useCallback(
     (scanned: Scan, center?: { x: number; y: number }, source?: ScanSource) => {
       const result = withDisplayFormat(scanned)
+      // Stesso codice già in cronologia: la voce viene sostituita, quindi la sua statistica parte ora.
+      for (const old of historyRef.current) if (old.raw === result.raw && old.id !== result.id) dispatch(old.id)
       if (source) {
         pendingEvents.current.set(result.id, source)
-        // Se un controllo non risponde, l'evento parte comunque con i dati disponibili.
+        // Se un controllo non risponde, l'evento parte comunque con i dati disponibili
+        // (salvo che si aspetti la risposta dell'utente sull'altro barcode).
         window.setTimeout(() => {
-          if (!pendingEvents.current.has(result.id)) return
-          pendingEvents.current.delete(result.id)
           const item = historyRef.current.find((h) => h.id === result.id)
-          if (item) sendEvent(item, source)
+          if (pendingEvents.current.has(result.id) && item && (!awaitsAnswer(item) || closedEvents.current.has(item.id))) dispatch(result.id)
         }, 12_000)
       }
       setOrigin(center ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.4 })
@@ -230,7 +283,7 @@ export default function App() {
       lint(result)
       guard(result)
     },
-    [verify, lint, guard],
+    [verify, lint, guard, dispatch],
   )
 
   // Ogni lettura passa da qui: se si sta leggendo l'altro barcode di un articolo, i dati si uniscono.
@@ -305,6 +358,13 @@ export default function App() {
       setCompanion(null)
       setScan(base)
     }
+  }
+
+  // "Non c'è un altro barcode": la risposta resta con la scansione e la statistica può partire.
+  function decline(target: Scan) {
+    const answer = (item: Scan): Scan => (item.id === target.id ? { ...item, assoc: 'declined' } : item)
+    setScan((current) => current && answer(current))
+    setHistory((list) => list.map(answer))
   }
 
   function readCompanion(base: Scan) {
@@ -403,7 +463,7 @@ export default function App() {
         />
       )}
 
-      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={openScanner} onRetry={() => verify(scan)} onNotice={setNotice} onCompanion={() => readCompanion(scan)} />}
+      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={openScanner} onRetry={() => verify(scan)} onNotice={setNotice} onCompanion={() => readCompanion(scan)} onDecline={() => decline(scan)} />}
 
       {drawer && (
         <Drawer

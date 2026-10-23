@@ -39,6 +39,9 @@ create table if not exists public.scan_events (
   primary_key       text,          -- valore della chiave (GTIN a 14 cifre per i prodotti)
   ai_list           text[],        -- AI presenti nel codice (lotto, scadenza…)
   issuer_mo         text,          -- organizzazione GS1 del prefisso (dalla tabella dei prefissi)
+  barcode_count     smallint,      -- barcode letti per l'articolo (più di 1: dati su più barcode, es. etichetta logistica)
+  assoc_notices     text[],        -- avvisi sulle associazioni obbligatorie tra AI (GS1 GenSpecs §4.13.2), es. missing:3922
+  assoc_outcome     text check (assoc_outcome in ('completed', 'declined', 'unanswered')),
 
   -- Verified by GS1
   vbg_state         text check (vbg_state in ('verified', 'licensed', 'invalid', 'error')),
@@ -68,6 +71,13 @@ alter table public.scan_events add column if not exists brand_name text;
 alter table public.scan_events add column if not exists vbg_record_status text;
 alter table public.scan_events add column if not exists vbg_licence_status text;
 alter table public.scan_events add column if not exists city text;
+alter table public.scan_events add column if not exists barcode_count smallint;
+alter table public.scan_events add column if not exists assoc_notices text[];
+alter table public.scan_events add column if not exists assoc_outcome text;
+do $$ begin
+  alter table public.scan_events add constraint scan_events_assoc_outcome_check check (assoc_outcome in ('completed', 'declined', 'unanswered'));
+exception when duplicate_object then null;
+end $$;
 
 comment on table public.scan_events is
   'Una riga per scansione completata nell''app VbG Scan. Nessun dato personale: niente IP né identificativi; posizione approssimativa (paese, regione, città) dedotta da Cloudflare.';

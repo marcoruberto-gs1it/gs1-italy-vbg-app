@@ -235,6 +235,7 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   if (notices.length) {
     w.section(t('Avvisi sui dati'))
     for (const n of notices) w.row(`AI (${n.ai})`, n.message, { mark: 'missing' })
+    if (scan.assoc === 'declined') w.row(t('Altro barcode'), t('L’utente ha indicato che non c’è'), { mark: 'bad' })
     if (notices.some((n) => n.kind === 'missing')) w.paragraph(t('Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo (GS1 General Specifications §4.13.2).'), { size: 8.5, color: MUTED })
   }
 

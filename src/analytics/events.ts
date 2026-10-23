@@ -3,7 +3,7 @@
  * (/api/events), che aggiunge la regione da Cloudflare e lo salva su Supabase.
  * Nessun dato personale: niente identificativi, dei link solo il dominio.
  */
-import { codeType, gs1Compliance, type Scan } from '../components/scan'
+import { awaitsAnswer, codeType, gs1Compliance, missingNotices, type Scan } from '../components/scan'
 import { assessLink, registrableDomain } from '../gs1/linkSafety'
 import { canVerify } from '../gs1/vbg'
 
@@ -18,6 +18,15 @@ export function isSettled(scan: Scan) {
   if (canVerify(scan.primary?.ai) && !scan.vbg) return false
   if (scan.url && !scan.webRisk) return false
   return true
+}
+
+/**
+ * Esito della domanda sull'altro barcode: completed = dati completati leggendo un altro barcode;
+ * declined = l'utente ha detto che non c'è; unanswered = nessuna risposta. null = domanda non necessaria.
+ */
+export function assocOutcome(scan: Scan) {
+  if (missingNotices(scan).length) return awaitsAnswer(scan) ? 'unanswered' : (scan.assoc ?? null)
+  return scan.barcodes ? 'completed' : null
 }
 
 function coreCount(scan: Scan) {
@@ -46,6 +55,10 @@ export function buildEvent(scan: Scan, source: ScanSource) {
     primary_ai: scan.primary?.ai ?? null,
     primary_key: primaryKey,
     ai_list: scan.fields.map((f) => f.ai),
+    // Articolo letto da più barcode e avvisi sulle associazioni tra AI (codici stabili, es. missing:3922).
+    barcode_count: scan.barcodes?.length ?? 1,
+    assoc_notices: scan.syntax?.notices?.map((n) => n.code) ?? null,
+    assoc_outcome: assocOutcome(scan),
     issuer_mo: scan.issuer ?? null,
     vbg_state: v?.state ?? null,
     vbg_complete: v?.complete ?? null,

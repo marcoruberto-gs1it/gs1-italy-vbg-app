@@ -1716,12 +1716,17 @@
 .assoc h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--warn); }
 .assoc ul { display: grid; gap: 8px; margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.45; color: var(--ink); }
 .assoc-hint { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.assoc-ask { display: grid; gap: 8px; padding: 14px; border-radius: 16px; background: var(--warn-bg); }
+.assoc-ask strong { font-size: 15px; color: var(--ink); }
+.assoc-ask p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink); }
+.assoc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .assoc-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px; justify-self: start;
-  min-height: 44px; padding: 0 16px; border-radius: 14px; background: var(--warn-bg); color: var(--warn);
-  font-weight: 700; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 16px; border-radius: 14px; background: var(--surface); color: var(--ink);
+  font-weight: 700; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(15, 33, 71, 0.14);
 }
-.assoc-btn:hover { filter: brightness(0.97); }
+.assoc-btn.is-primary { background: var(--navy); color: #fff; box-shadow: none; }
+.assoc-btn:hover { filter: brightness(0.96); }
 .assoc-source { font-size: 11.5px; color: var(--muted); }
 
 .scanner-hint {

@@ -9,7 +9,7 @@ import type { WebRiskResult } from '../gs1/webRisk'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
-import { codeType, formatKind, gs1Compliance, titleOf, type Scan } from './scan'
+import { codeType, formatKind, gs1Compliance, missingNotices, titleOf, type Scan } from './scan'
 import { Symbol2D } from './symbol'
 import { t } from '../i18n'
 import { formatLabel } from '../lib/display'
@@ -26,6 +26,8 @@ type Props = {
   onNotice: (text: string) => void
   /** Legge un altro barcode dello stesso articolo, per completare i dati. */
   onCompanion: () => void
+  /** L'utente indica che sull'articolo non c'è un altro barcode. */
+  onDecline: () => void
 }
 
 const hostOf = (href: string) => {
@@ -36,7 +38,7 @@ const hostOf = (href: string) => {
   }
 }
 
-export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onCompanion }: Props) {
+export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onCompanion, onDecline }: Props) {
   const scope = useRef<HTMLElement>(null)
   const mounted = useRef(false)
   const [copied, setCopied] = useState(false)
@@ -51,7 +53,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
   const type = codeType(scan)
   const compliance = gs1Compliance(scan)
   const notices = scan.syntax?.notices ?? []
-  const missing = notices.some((n) => n.kind === 'missing')
+  const missing = missingNotices(scan)
   // Si disegna solo ciò che è stato davvero scansionato: il simbolo 2D modulo per modulo,
   // oppure le barre EAN/UPC-A, la cui codifica è univoca. Mai un barcode 1D al posto di un codice 2D.
   const drawBars = !scan.symbol && Boolean(barDigits) && /^(EAN-13|EAN-8|UPC-A)$/.test(scan.format)
@@ -243,13 +245,20 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
             <ul>
               {notices.map((n) => <li key={`${n.kind}-${n.ai}`}>{n.message}</li>)}
             </ul>
-            {missing && (
-              <>
-                <p className="assoc-hint">{t('Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo, per esempio su un’etichetta logistica con più GS1-128. Leggilo per controllare l’articolo completo.')}</p>
-                <button className="assoc-btn" type="button" onClick={onCompanion}>
-                  <ScanBarcode size={18} /> {t('Leggi l’altro barcode')}
-                </button>
-              </>
+            {missing.length > 0 && !scan.assoc && (
+              <div className="assoc-ask">
+                <strong>{t('C’è un altro barcode su questo articolo?')}</strong>
+                <p>{t('Cerca un barcode con: {needs}. Per GS1 questi dati possono stare in un altro barcode dello stesso articolo, per esempio su un’etichetta logistica con più GS1-128.', { needs: missing.map((n) => n.needs).filter(Boolean).join('; ') })}</p>
+                <div className="assoc-actions">
+                  <button className="assoc-btn is-primary" type="button" onClick={onCompanion}>
+                    <ScanBarcode size={18} /> {t('Sì, leggilo')}
+                  </button>
+                  <button className="assoc-btn" type="button" onClick={onDecline}>{t('No, non c’è')}</button>
+                </div>
+              </div>
+            )}
+            {missing.length > 0 && scan.assoc === 'declined' && (
+              <p className="assoc-hint">{t('Hai indicato che non c’è un altro barcode: all’articolo mancano dati obbligatori.')}</p>
             )}
             <small className="assoc-source">{t('Regole: GS1 General Specifications, associazioni obbligatorie (§4.13.2).')}</small>
           </section>
