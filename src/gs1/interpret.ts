@@ -1,14 +1,17 @@
 /*
  * Interpretazione di una scansione GS1.
- * Port TypeScript della logica di gs1/interpretGS1scan (Apache 2.0), basata sul
- * GS1 Digital Link Toolkit ufficiale: accetta GTIN puri, element string con
+ * Scomposizione negli AI con la GS1 Barcode Syntax Engine (lo stesso GS1 Barcode Syntax Dictionary
+ * usato per la validazione: tutti gli AI ufficiali). Se i dati non sono validi o l'engine non è
+ * disponibile si ripiega sul GS1 Digital Link Toolkit, più tollerante, così si vede comunque il
+ * contenuto (e il controllo di sintassi segnala l'errore). Accetta GTIN puri, element string con
  * parentesi o FNC1 e URI GS1 Digital Link (anche compressi).
  */
 import type { AiValues } from '../vendor/gs1/GS1DigitalLinkToolkit.js'
-import { locale, t } from '../i18n'
-import { aiLabel } from './labels'
+import { PRIMARY_KEYS, aiLabel, checkDigitOk } from './aiDictionary'
+import { readable, type Tone } from './aiFormat'
+import { loadSyntaxEngine } from './syntax'
 
-export type Tone = 'ok' | 'warn' | 'bad'
+export type { Tone }
 
 export type Field = {
   ai: string
@@ -39,15 +42,6 @@ let toolkitPromise: Promise<Toolkit> | null = null
 let prefixesPromise: Promise<{ prefix: string; mo: string }[]> | null = null
 let countriesPromise: Promise<Map<string, string>> | null = null
 
-/** Nome del paese nella lingua corrente, dal codice ISO 3166-1 alpha-2. */
-function countryName(alpha2: string) {
-  try {
-    return new Intl.DisplayNames([locale()], { type: 'region' }).of(alpha2) ?? alpha2
-  } catch {
-    return alpha2
-  }
-}
-
 export function loadToolkit() {
   toolkitPromise ??= import('../vendor/gs1/GS1DigitalLinkToolkit.js').then(({ default: T }) => new T())
   return toolkitPromise
@@ -74,70 +68,6 @@ const GS = String.fromCharCode(29)
 const GTIN_RE = /^(\d{8}|\d{12,14})$/
 const DL_RE = /^https?:\/\/[^\s/?#]+(\/[^\s?#]*)?\/(01|gtin|8006|itip|8013|gmn|8010|cpid|414|gln|417|party|8017|gsrnp|8018|gsrn|255|gcn|00|sscc|253|gdti|401|ginc|402|gsin|8003|grai|8004|giai)\/\d{4}[^/\s]*/i
 const DL_COMPRESSED_RE = /^https?:\/\/[^\s/?#]+(\/[^\s?#]*)?\/[0-9A-Za-z_-]{10,}$/
-const DATE_AIS = new Set(['11', '12', '13', '15', '16', '17'])
-
-/** Anno a 2 cifre secondo la regola GS1 (finestra -49/+50 anni). */
-function gs1Year(yy: number) {
-  const now = new Date().getFullYear()
-  const century = Math.floor(now / 100) * 100
-  const diff = yy - (now % 100)
-  if (diff >= 51) return century - 100 + yy
-  if (diff <= -50) return century + 100 + yy
-  return century + yy
-}
-
-function parseGs1Date(value: string) {
-  const year = gs1Year(Number(value.slice(0, 2)))
-  const month = Number(value.slice(2, 4))
-  const day = Number(value.slice(4, 6))
-  // DD = 00 indica l'ultimo giorno del mese
-  return day === 0 ? new Date(year, month, 0) : new Date(year, month - 1, day)
-}
-
-
-function describeDate(ai: string, value: string): Pick<Field, 'display' | 'note' | 'tone'> {
-  if (!/^\d{6}$/.test(value)) return { display: value }
-  const date = parseGs1Date(value)
-  const display = value.endsWith('00')
-    ? date.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
-    : date.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
-  if (ai !== '17' && ai !== '15') return { display }
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const days = Math.round((date.getTime() - today.getTime()) / 86_400_000)
-  if (days < 0) return { display, note: ai === '17' ? t('Scaduto') : t('Superato'), tone: 'bad' }
-  if (days === 0) return { display, note: t('Oggi'), tone: 'warn' }
-  if (days <= 7) return { display, note: days === 1 ? t('Tra 1 giorno') : t('Tra {n} giorni', { n: days }), tone: 'warn' }
-  return { display, note: t('Valido'), tone: 'ok' }
-}
-
-const measureUnits: Record<string, string> = {
-  '310': 'kg', '311': 'm', '312': 'm', '313': 'm', '314': 'm²', '315': 'l', '316': 'm³',
-  '320': 'lb', '330': 'kg', '331': 'm', '332': 'm', '333': 'm', '334': 'm²', '335': 'l', '336': 'm³',
-}
-
-function formatDisplay(ai: string, value: string, countries: Map<string, string>): Pick<Field, 'display' | 'note' | 'tone'> {
-  if (DATE_AIS.has(ai)) return describeDate(ai, value)
-  if (ai === '01' || ai === '02') {
-    return { display: value.length === 14 && value.startsWith('0') ? value.slice(1) : value }
-  }
-  const unit = measureUnits[ai.slice(0, 3)]
-  if (ai.length === 4 && unit) {
-    const decimals = Number(ai[3])
-    const amount = Number(value) / 10 ** decimals
-    return { display: `${amount.toLocaleString(locale(), { maximumFractionDigits: decimals })} ${unit}` }
-  }
-  if (/^39[02]\d$/.test(ai)) {
-    const amount = Number(value) / 10 ** Number(ai[3])
-    return { display: amount.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: Number(ai[3]) }) }
-  }
-  if (['422', '423', '424', '425', '426'].includes(ai)) {
-    const names = value.match(/\d{3}/g)?.map((code) => (countries.has(code) ? countryName(countries.get(code)!) : code))
-    if (names) return { display: names.join(', ') }
-  }
-  return { display: value }
-}
-
 async function issuerFor(ai: string, value: string) {
   const prefixes = await loadPrefixes()
   const key = ai === '01' || ai === '00' ? value.padStart(ai === '01' ? 14 : 18, '0').slice(1) : value
@@ -157,13 +87,57 @@ function asUrl(text: string) {
   }
 }
 
+type Parsed = { values: AiValues; other: AiValues; url?: string; digitalLink?: string }
+
+/**
+ * Scomposizione con la GS1 Barcode Syntax Engine: AI e valori nell'ordine del codice, più il GS1 Digital
+ * Link equivalente. null se l'engine rifiuta i dati (es. cifra di controllo errata) o non è disponibile.
+ * Accetta AI non in dizionario e non controlla le associazioni tra AI: qui serve leggere, non validare
+ * (lo fa checkSyntax, che trova l'engine con le impostazioni normali).
+ */
+async function viaEngine(input: { ai: string } | { data: string }): Promise<{ values: AiValues; digitalLink?: string } | null> {
+  let engine: Awaited<ReturnType<typeof loadSyntaxEngine>>
+  try {
+    engine = await loadSyntaxEngine()
+  } catch {
+    return null
+  }
+  const settings = { permitUnknownAIs: engine.permitUnknownAIs, validateAIassociations: engine.validateAIassociations }
+  try {
+    engine.permitUnknownAIs = true
+    engine.validateAIassociations = false
+    if ('ai' in input) engine.aiDataStr = input.ai
+    else engine.dataStr = input.data
+    const values: AiValues = {}
+    for (const line of engine.hri) {
+      const m = line.match(/^\((\d{2,4})\) (.*)$/s)
+      if (m) values[m[1]] = m[2]
+    }
+    let digitalLink: string | undefined
+    try {
+      digitalLink = engine.getDLuri('https://id.gs1.org')
+    } catch {
+      digitalLink = undefined // nessuna chiave primaria: niente GS1 Digital Link
+    }
+    return Object.keys(values).length ? { values, digitalLink } : null
+  } catch {
+    return null
+  } finally {
+    engine.permitUnknownAIs = settings.permitUnknownAIs
+    engine.validateAIassociations = settings.validateAIassociations
+  }
+}
+
 /** Estrae gli AI dal contenuto, oppure null se non è un dato GS1. */
-async function extract(raw: string, manual: boolean): Promise<{ values: AiValues; other: AiValues; url?: string } | null> {
+async function extract(raw: string, manual: boolean): Promise<Parsed | null> {
   const tk = await loadToolkit()
   let text = raw.trim().replace(/^\][A-Za-z]\d/, '')
   if (text.startsWith(GS)) text = text.slice(1)
 
-  if (GTIN_RE.test(text)) return { values: { '01': text.padStart(14, '0') }, other: {} }
+  if (GTIN_RE.test(text)) {
+    const values = { '01': text.padStart(14, '0') }
+    return { values, other: {}, digitalLink: (await viaEngine({ ai: `(01)${values['01']}` }))?.digitalLink }
+  }
 
   const url = asUrl(text)
   if (url) {
@@ -171,14 +145,26 @@ async function extract(raw: string, manual: boolean): Promise<{ values: AiValues
       const uncompressed = DL_RE.test(url) ? url : DL_COMPRESSED_RE.test(url) ? tk.decompressGS1DigitalLink(url, false, 'https://id.gs1.org') : null
       if (!uncompressed) return null
       const { GS1, other } = tk.extractFromGS1digitalLink(uncompressed)
+      const engine = await viaEngine({ data: uncompressed })
+      if (engine) return { values: engine.values, other, url, digitalLink: engine.digitalLink }
       return Object.keys(GS1).length ? { values: GS1, other, url } : null
     } catch {
       return null
     }
   }
 
-  const looksGs1 = /^\(\d{2,4}\)/.test(text) || text.includes(GS) || (manual && /^\d{4,}/.test(text))
+  const bracketed = /^\(\d{2,4}\)/.test(text)
+  const looksGs1 = bracketed || text.includes(GS) || (manual && /^\d{4,}/.test(text))
   if (!looksGs1) return null
+  // Dati grezzi del lettore: FNC1 iniziale e separatori GS diventano "^" per l'engine.
+  const engine = await viaEngine(bracketed ? { ai: text } : { data: `^${text.replaceAll(GS, '^')}` })
+  if (engine) return { values: engine.values, other: {}, digitalLink: engine.digitalLink }
+  // Dati non validi: si mostrano lo stesso. Con le parentesi gli AI si leggono direttamente (anche
+  // quelli che il Toolkit non conosce); per i dati grezzi serve la tabella del Toolkit.
+  if (bracketed) {
+    const values: AiValues = Object.fromEntries([...text.matchAll(/\((\d{2,4})\)([^(]*)/g)].map((m) => [m[1], m[2]]))
+    return Object.keys(values).length ? { values, other: {} } : null
+  }
   try {
     const values = tk.extractFromGS1elementStrings(text)
     return Object.keys(values).length ? { values, other: {} } : null
@@ -196,32 +182,22 @@ export async function interpretScan(raw: string, format: string): Promise<ScanRe
     return { ...base, kind: url ? 'url' : 'text', url, fields: [] }
   }
 
-  const [tk, countries] = await Promise.all([loadToolkit(), loadCountries()])
-  const entry = (ai: string) => tk.aitable.find((item) => item.ai === ai)
+  const countries = await loadCountries()
   const keys = Object.keys(parsed.values)
-  const primaryAi = keys.find((ai) => entry(ai)?.type === 'I')
-  const qualifiers = primaryAi ? (tk.aiQualifiers[primaryAi] ?? []).filter((ai) => ai in parsed.values) : []
+  // Chiave primaria (GTIN, SSCC, GLN…) e i suoi qualificatori, poi gli altri AI nell'ordine del codice.
+  const primaryAi = keys.find((ai) => ai in PRIMARY_KEYS)
+  const qualifiers = primaryAi ? PRIMARY_KEYS[primaryAi].filter((ai) => ai in parsed.values) : []
   const ordered = [...(primaryAi ? [primaryAi] : []), ...qualifiers, ...keys.filter((ai) => ai !== primaryAi && !qualifiers.includes(ai))]
 
   const fields: Field[] = ordered.map((ai) => {
     const value = parsed.values[ai]
-    return { ai, value, label: aiLabel(ai, entry(ai)?.title), ...formatDisplay(ai, value, countries) }
+    return { ai, value, label: aiLabel(ai), ...readable(ai, value, countries) }
   })
 
-  let checkDigit: boolean | undefined
-  if (primaryAi && entry(primaryAi)?.checkDigit) {
+  let digitalLink = parsed.digitalLink
+  if (primaryAi && !digitalLink) {
     try {
-      tk.verifyCheckDigit(primaryAi, parsed.values[primaryAi])
-      checkDigit = true
-    } catch {
-      checkDigit = false
-    }
-  }
-
-  let digitalLink: string | undefined
-  if (primaryAi) {
-    try {
-      digitalLink = tk.buildGS1digitalLink(parsed.values, false, 'https://id.gs1.org', parsed.other)
+      digitalLink = (await loadToolkit()).buildGS1digitalLink(parsed.values, false, 'https://id.gs1.org', parsed.other)
     } catch {
       digitalLink = undefined
     }
@@ -235,7 +211,7 @@ export async function interpretScan(raw: string, format: string): Promise<ScanRe
     fields: primary ? fields.slice(1) : fields,
     digitalLink,
     url: parsed.url,
-    checkDigit,
+    checkDigit: primaryAi ? checkDigitOk(primaryAi, parsed.values[primaryAi]) : undefined,
     issuer: primaryAi ? await issuerFor(primaryAi, parsed.values[primaryAi]) : undefined,
   }
 }

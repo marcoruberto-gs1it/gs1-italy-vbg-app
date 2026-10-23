@@ -7,4 +7,5 @@ export class GS1encoder {
   dataStr: string
   validateAIassociations: boolean
   permitUnknownAIs: boolean
+  getDLuri(stem?: string | null): string
 }
