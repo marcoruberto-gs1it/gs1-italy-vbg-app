@@ -162,7 +162,7 @@ async function extract(raw: string, manual: boolean): Promise<Parsed | null> {
   // Dati non validi: si mostrano lo stesso. Con le parentesi gli AI si leggono direttamente (anche
   // quelli che il Toolkit non conosce); per i dati grezzi serve la tabella del Toolkit.
   if (bracketed) {
-    const values: AiValues = Object.fromEntries([...text.matchAll(/\((\d{2,4})\)([^(]*)/g)].map((m) => [m[1], m[2]]))
+    const values: AiValues = Object.fromEntries([...text.matchAll(/\((\d{2,4})\)((?:\\\(|[^(])*)/g)].map((m) => [m[1], m[2].replace(/\\\(/g, '(')]))
     return Object.keys(values).length ? { values, other: {} } : null
   }
   try {

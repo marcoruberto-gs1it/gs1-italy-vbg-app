@@ -6,7 +6,39 @@ import type { StoredSymbol } from './symbolData'
 import { t } from '../i18n'
 
 /** `vbg` assente = verifica non ancora arrivata (o non richiesta, vedi needsVerification). */
-export type Scan = ScanResult & { vbg?: Verification; symbol?: StoredSymbol; syntax?: SyntaxCheck | null; webRisk?: WebRiskResult }
+export type Scan = ScanResult & {
+  vbg?: Verification
+  symbol?: StoredSymbol
+  syntax?: SyntaxCheck | null
+  webRisk?: WebRiskResult
+  /** Barcode letti per questo articolo, quando i dati sono su più barcode (es. etichetta logistica). */
+  barcodes?: { format: string; raw: string }[]
+}
+
+export type Combination =
+  | { ok: true; data: string; barcodes: NonNullable<Scan['barcodes']> }
+  | { ok: false; reason: 'not-gs1' | 'other-item' | 'different-values'; ai?: string }
+
+/**
+ * Unisce i dati di un secondo barcode dello stesso articolo (GS1 General Specifications §4.13.2: gli AI
+ * associati possono stare in barcode diversi). È un altro articolo se la chiave primaria è diversa;
+ * lo stesso AI con valori diversi non è ammesso. data: element string con tutti gli AI, da reinterpretare.
+ */
+export function combineScans(base: Scan, extra: Scan): Combination {
+  if (extra.kind !== 'gs1') return { ok: false, reason: 'not-gs1' }
+  if (base.primary && extra.primary && (base.primary.ai !== extra.primary.ai || base.primary.value !== extra.primary.value)) return { ok: false, reason: 'other-item' }
+  const values = new Map<string, string>()
+  for (const field of [base.primary, ...base.fields, extra.primary, ...extra.fields]) {
+    if (!field) continue
+    const known = values.get(field.ai)
+    if (known !== undefined && known !== field.value) return { ok: false, reason: 'different-values', ai: field.ai }
+    values.set(field.ai, field.value)
+  }
+  // Parentesi nei valori: si proteggono come previsto dalla sintassi con parentesi.
+  const data = [...values].map(([ai, value]) => `(${ai})${value.replace(/\(/g, '\\(')}`).join('')
+  const barcodes = [...(base.barcodes ?? [{ format: base.format, raw: base.raw }]), { format: extra.format, raw: extra.raw }]
+  return { ok: true, data, barcodes }
+}
 
 export function needsVerification(scan: Scan) {
   return canVerify(scan.primary?.ai) && (!scan.vbg || scan.vbg.state === 'error')
@@ -65,8 +97,10 @@ export function codeType(scan: Scan): CodeType {
   if (primary) {
     const kind = keyKinds[primary.ai]
     ;[subject, key] = kind ? [t(kind[0]), kind[1]] : [primary.label, undefined]
-    // GTIN-14 con indicatore diverso da 0: imballo che contiene più unità.
-    if (primary.ai === '01' && primary.value.length === 14 && !primary.value.startsWith('0')) [subject, key] = [t('Imballo'), 'GTIN-14']
+    // GTIN-14 con indicatore 1–8: imballo che contiene più unità; 9: prodotto a peso variabile (§2.1.7.2).
+    if (primary.ai === '01' && primary.value.length === 14 && !primary.value.startsWith('0')) {
+      ;[subject, key] = [primary.value.startsWith('9') ? t('Prodotto a peso variabile') : t('Imballo'), 'GTIN-14']
+    }
   } else {
     subject = scan.kind === 'gs1' ? t('Dati GS1') : scan.kind === 'url' ? t('Link') : t('Testo')
   }

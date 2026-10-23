@@ -24,6 +24,8 @@ type Props = {
   onRescan: () => void
   onRetry: () => void
   onNotice: (text: string) => void
+  /** Legge un altro barcode dello stesso articolo, per completare i dati. */
+  onCompanion: () => void
 }
 
 const hostOf = (href: string) => {
@@ -34,7 +36,7 @@ const hostOf = (href: string) => {
   }
 }
 
-export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: Props) {
+export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onCompanion }: Props) {
   const scope = useRef<HTMLElement>(null)
   const mounted = useRef(false)
   const [copied, setCopied] = useState(false)
@@ -48,6 +50,8 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
   const issuer = vbg?.licensee?.mo ?? scan.issuer
   const type = codeType(scan)
   const compliance = gs1Compliance(scan)
+  const notices = scan.syntax?.notices ?? []
+  const missing = notices.some((n) => n.kind === 'missing')
   // Si disegna solo ciò che è stato davvero scansionato: il simbolo 2D modulo per modulo,
   // oppure le barre EAN/UPC-A, la cui codifica è univoca. Mai un barcode 1D al posto di un codice 2D.
   const drawBars = !scan.symbol && Boolean(barDigits) && /^(EAN-13|EAN-8|UPC-A)$/.test(scan.format)
@@ -199,6 +203,7 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
                 {type.tag !== type.title && <span className="tag tag-strong">{type.tag}</span>}
                 {type.manual && <span className="tag">{t('Inserito a mano')}</span>}
                 {type.count > 1 && <span className="tag">{t('{n} dati', { n: type.count })}</span>}
+                {scan.barcodes && <span className="tag">{t('{n} barcode', { n: scan.barcodes.length })}</span>}
                 {issuer && /^GS1\b/.test(issuer) && <span className="tag">{issuer}</span>}
               </span>
             </div>
@@ -231,6 +236,24 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice }: P
 
         {/* Il link del QR Code va valutato prima di tutto: è quello che l'utente sta per aprire. */}
         {scan.url && <LinkCard url={scan.url} webRisk={scan.webRisk} raw={scan.raw.trim()} manual={scan.format === 'Manuale'} gs1={scan.kind === 'gs1'} vbg={scan.kind === 'gs1' ? (verifiable ? vbg : null) : null} safeUrl={scan.digitalLink} />}
+
+        {notices.length > 0 && (
+          <section className="result-card assoc" aria-labelledby="assoc-title">
+            <h2 id="assoc-title"><TriangleAlert size={18} aria-hidden="true" /> {t('Avvisi sui dati')}</h2>
+            <ul>
+              {notices.map((n) => <li key={`${n.kind}-${n.ai}`}>{n.message}</li>)}
+            </ul>
+            {missing && (
+              <>
+                <p className="assoc-hint">{t('Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo, per esempio su un’etichetta logistica con più GS1-128. Leggilo per controllare l’articolo completo.')}</p>
+                <button className="assoc-btn" type="button" onClick={onCompanion}>
+                  <ScanBarcode size={18} /> {t('Leggi l’altro barcode')}
+                </button>
+              </>
+            )}
+            <small className="assoc-source">{t('Regole: GS1 General Specifications, associazioni obbligatorie (§4.13.2).')}</small>
+          </section>
+        )}
 
         {verifiable && <VbgCard vbg={vbg} isProduct={primary?.ai === '01'} onRetry={onRetry} />}
 

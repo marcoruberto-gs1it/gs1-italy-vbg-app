@@ -6,6 +6,7 @@
  */
 import type { ScanResult } from './interpret'
 import { lang, t } from '../i18n'
+import { missingFromEngine, valueAssociations, type AssociationNotice } from './associations'
 
 export type SyntaxCheck = {
   ok: boolean
@@ -16,6 +17,8 @@ export type SyntaxCheck = {
   markup?: string
   /** Il problema riguarda solo la forma del GS1 Digital Link, non i dati. */
   digitalLink?: boolean
+  /** Associazioni obbligatorie tra AI non soddisfatte o incoerenti: avvisi, non errori (vedi associations.ts). */
+  notices?: AssociationNotice[]
 }
 
 type Encoder = InstanceType<typeof import('../vendor/gs1/syntax-engine/gs1encoder.mjs').GS1encoder>
@@ -70,6 +73,27 @@ export function translate(message: string): string {
   return text ? text[0].toUpperCase() + text.slice(1) + '.' : message
 }
 
+type EngineInput = { ai: string } | { data: string }
+
+/**
+ * Dati da controllare, il più possibile come sono stati letti: element string con parentesi o dati
+ * grezzi con FNC1 così come sono (l'engine vede anche, per esempio, lo stesso AI ripetuto con valori
+ * diversi); altrimenti (GTIN puro, GS1 Digital Link) l'element string ricostruita dagli AI.
+ */
+function engineInput(scan: ScanResult): EngineInput {
+  const GS = String.fromCharCode(29)
+  let text = scan.raw.trim().replace(/^\][A-Za-z]\d/, '')
+  if (text.startsWith(GS)) text = text.slice(1)
+  if (/^\(\d{2,4}\)/.test(text)) return { ai: text }
+  if (text.includes(GS)) return { data: `^${text.replaceAll(GS, '^')}` }
+  return { ai: asAiString(scan) }
+}
+
+function load(engine: Encoder, input: EngineInput) {
+  if ('ai' in input) engine.aiDataStr = input.ai
+  else engine.dataStr = input.data
+}
+
 function asAiString(scan: ScanResult) {
   const all = [...(scan.primary ? [scan.primary] : []), ...scan.fields]
   return all.map((f) => `(${f.ai})${f.value}`).join('')
@@ -85,13 +109,25 @@ export async function checkSyntax(scan: ScanResult): Promise<SyntaxCheck | null>
     return null
   }
 
-  // 1. I dati GS1, con tutte le regole del Syntax Dictionary.
+  // 1. I dati GS1, con tutte le regole del Syntax Dictionary. L'engine controlla nell'ordine i dati di
+  // ogni AI, le coppie vietate e infine gli AI obbligatori: se l'errore è un AI obbligatorio mancante,
+  // dati e coppie sono già in regola. Il dato mancante può stare in un altro barcode dello stesso
+  // articolo (§4.13.2), quindi diventa un avviso; si ricontrolla senza associazioni per non perdere
+  // gli altri errori (es. lo stesso AI ripetuto con valori diversi).
+  const data = engineInput(scan)
+  const notices: AssociationNotice[] = []
   try {
-    engine.aiDataStr = asAiString(scan)
+    load(engine, data)
   } catch (error) {
     const original = error instanceof Error ? error.message : String(error)
-    return { ok: false, message: translate(original), original, markup: engine.errMarkup || undefined }
+    const missing = missingFromEngine(original)
+    const failure = missing ? withoutAssociations(engine, data) : { original, markup: engine.errMarkup || undefined }
+    if (failure) return { ok: false, message: translate(failure.original), original: failure.original, markup: failure.markup }
+    notices.push(missing!)
   }
+  const values = Object.fromEntries([...(scan.primary ? [scan.primary] : []), ...scan.fields].map((f) => [f.ai, f.value]))
+  notices.push(...valueAssociations(values))
+  const extra = notices.length ? { notices } : {}
 
   // 2. La forma del GS1 Digital Link letto (solo link non compressi: quelli compressi li espande il toolkit).
   if (scan.url && /\/(01|00|414|417|8003|8004|8006|8010|8013|8017|8018|253|255|401|402|gtin|sscc|gln)\//i.test(scan.url)) {
@@ -99,8 +135,21 @@ export async function checkSyntax(scan: ScanResult): Promise<SyntaxCheck | null>
       engine.dataStr = scan.url
     } catch (error) {
       const original = error instanceof Error ? error.message : String(error)
-      return { ok: false, digitalLink: true, message: t('Il link non rispetta la sintassi GS1 Digital Link: {error}', { error: translate(original) }), original, markup: engine.errMarkup || undefined }
+      return { ok: false, digitalLink: true, message: t('Il link non rispetta la sintassi GS1 Digital Link: {error}', { error: translate(original) }), original, markup: engine.errMarkup || undefined, ...extra }
     }
   }
-  return { ok: true }
+  return { ok: true, ...extra }
+}
+
+/** Ricontrollo senza le associazioni tra AI: null se i dati sono validi, altrimenti l'errore. */
+function withoutAssociations(engine: Encoder, data: EngineInput): { original: string; markup?: string } | null {
+  try {
+    engine.validateAIassociations = false
+    load(engine, data)
+    return null
+  } catch (error) {
+    return { original: error instanceof Error ? error.message : String(error), markup: engine.errMarkup || undefined }
+  } finally {
+    engine.validateAIassociations = true
+  }
 }

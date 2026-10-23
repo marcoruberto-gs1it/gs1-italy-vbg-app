@@ -227,6 +227,15 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
     }
     if (scan.checkDigit !== undefined) w.row(t('Cifra di controllo'), scan.checkDigit ? t('Corretta') : t('Errata'), { mark: scan.checkDigit ? 'ok' : 'bad' })
     if (scan.digitalLink) w.row('GS1 Digital Link', scan.digitalLink, { mono: true })
+    if (scan.barcodes) w.row(t('Barcode letti'), scan.barcodes.map((b) => formatLabel(b.format)).join(' + '))
+  }
+
+  // Associazioni obbligatorie tra AI non soddisfatte o incoerenti
+  const notices = scan.syntax?.notices ?? []
+  if (notices.length) {
+    w.section(t('Avvisi sui dati'))
+    for (const n of notices) w.row(`AI (${n.ai})`, n.message, { mark: 'missing' })
+    if (notices.some((n) => n.kind === 'missing')) w.paragraph(t('Per GS1 questi dati possono trovarsi in un altro barcode dello stesso articolo (GS1 General Specifications §4.13.2).'), { size: 8.5, color: MUTED })
   }
 
   // Verified by GS1
@@ -278,8 +287,9 @@ export async function buildReport(scan: Scan): Promise<{ blob: Blob; filename: s
   const checks: [string, string, 'ok' | 'missing' | 'bad'][] = []
   checks.push([t('Lettura del simbolo'), `${formatLabel(type.title)}${scan.symbol ? `, ${t('{w}×{h} moduli', { w: scan.symbol.w, h: scan.symbol.h })}` : ''}`, 'ok'])
   if (scan.kind === 'gs1') {
-    checks.push([t('Interpretazione GS1'), 'GS1 Digital Link Toolkit (GS1)', 'ok'])
+    checks.push([t('Interpretazione GS1'), 'GS1 Barcode Syntax Engine · GS1 Digital Link Toolkit (GS1)', 'ok'])
     checks.push([t('Sintassi GS1'), scan.syntax ? (scan.syntax.ok ? t('Conforme · GS1 Barcode Syntax Engine') : `${t('Errori')} · ${scan.syntax.message ?? ''}`) : t('Non eseguito'), scan.syntax ? (scan.syntax.ok ? 'ok' : 'bad') : 'missing'])
+    if (scan.syntax) checks.push([t('Associazioni tra AI'), notices.length ? t('{n} avvisi · GS1 General Specifications §4.13.2', { n: notices.length }) : t('Rispettate · GS1 General Specifications §4.13.2'), notices.length ? 'missing' : 'ok'])
   }
   if (canVerify(scan.primary?.ai)) checks.push([t('Registro Verified by GS1'), scan.vbg ? (scan.vbg.state === 'error' ? t('Non disponibile') : t('Eseguito · API GS1 Italy')) : t('Non completato'), scan.vbg && scan.vbg.state !== 'error' ? 'ok' : 'missing'])
   if (scan.url) {

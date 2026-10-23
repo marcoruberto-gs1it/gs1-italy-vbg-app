@@ -24,6 +24,8 @@ type Props = {
   onManual: () => void
   onImage: () => void
   onIssue: (issue: CameraError | null) => void
+  /** Indicazione in alto (es. quando si legge l'altro barcode di un articolo). */
+  hint?: string
 }
 
 function quadStyle(q: Quad, linear: boolean): CSSProperties {
@@ -38,7 +40,7 @@ function quadStyle(q: Quad, linear: boolean): CSSProperties {
   return { left, top, width, height, margin: 0 }
 }
 
-export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue }: Props) {
+export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, hint }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [lock, setLock] = useState<{ quad: Quad; linear: boolean } | null>(null)
 
@@ -88,6 +90,7 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue }:
         <button className="glass" type="button" onClick={onClose} aria-label={t('Chiudi lo scanner')}>
           <X size={22} />
         </button>
+        {hint && <p className="scanner-hint" role="status">{hint}</p>}
       </header>
 
       {camera.status === 'starting' && <div className="pill">{t('Avvio fotocamera…')}</div>}

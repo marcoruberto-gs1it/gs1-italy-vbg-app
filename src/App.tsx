@@ -12,7 +12,7 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { checkSyntax, loadSyntaxEngine } from './gs1/syntax'
@@ -70,6 +70,9 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [cameraIssue, setCameraIssue] = useState<CameraError | null>(initialIssue)
   const [raised, setRaised] = useState(false)
+  // Scansione a cui si sta aggiungendo un altro barcode dello stesso articolo (dati su più barcode).
+  const [companion, setCompanion] = useState<Scan | null>(null)
+  const companionRef = useRef<Scan | null>(null)
   // Statistiche: scansioni nuove in attesa che tutti i controlli asincroni siano arrivati.
   const pendingEvents = useRef(new Map<string, ScanSource>())
   const historyRef = useRef(history)
@@ -166,7 +169,48 @@ export default function App() {
     })
   }, [])
 
-  const show = useCallback(
+  /**
+   * Secondo barcode dello stesso articolo: i dati si uniscono alla scansione di partenza e si ricontrollano
+   * insieme (GS1 General Specifications §4.13.2). Restituisce false se va mostrato come nuova scansione.
+   */
+  const attach = useCallback(
+    async (base: Scan, extra: Scan) => {
+      const joined = combineScans(base, extra)
+      if (!joined.ok) {
+        if (joined.reason === 'not-gs1') {
+          setNotice(t('Il barcode letto non contiene dati GS1'))
+          setScan(base)
+          return true
+        }
+        setNotice(joined.reason === 'other-item'
+          ? t('È un altro articolo: aperto come nuova scansione')
+          : t('I due barcode hanno valori diversi per l’AI ({ai}): aperto come nuova scansione', { ai: joined.ai ?? '' }))
+        return false
+      }
+      const fresh = await interpretScan(joined.data, base.format)
+      const samePrimary = fresh.primary?.ai === base.primary?.ai && fresh.primary?.value === base.primary?.value
+      const merged = withDisplayFormat({
+        ...base,
+        raw: joined.data,
+        primary: fresh.primary,
+        fields: fresh.fields,
+        digitalLink: fresh.digitalLink ?? base.digitalLink,
+        checkDigit: fresh.checkDigit,
+        issuer: fresh.issuer ?? base.issuer,
+        barcodes: joined.barcodes,
+        syntax: undefined,
+        vbg: samePrimary ? base.vbg : undefined,
+      })
+      setScan(merged)
+      setHistory((list) => list.map((item) => (item.id === merged.id ? merged : item)))
+      verify(merged)
+      lint(merged)
+      return true
+    },
+    [verify, lint],
+  )
+
+  const present = useCallback(
     (scanned: Scan, center?: { x: number; y: number }, source?: ScanSource) => {
       const result = withDisplayFormat(scanned)
       if (source) {
@@ -187,6 +231,20 @@ export default function App() {
       guard(result)
     },
     [verify, lint, guard],
+  )
+
+  // Ogni lettura passa da qui: se si sta leggendo l'altro barcode di un articolo, i dati si uniscono.
+  const show = useCallback(
+    (scanned: Scan, center?: { x: number; y: number }, source?: ScanSource) => {
+      const base = companionRef.current
+      if (!base) return present(scanned, center, source)
+      companionRef.current = null
+      setCompanion(null)
+      void attach(base, scanned).then((handled) => {
+        if (!handled) present(scanned, center, source)
+      })
+    },
+    [attach, present],
   )
 
   // Rilegge una scansione nella lingua corrente: nomi dei campi, date, paesi, messaggi della Syntax Engine
@@ -240,6 +298,22 @@ export default function App() {
   function closeScanner() {
     setScannerOpen(false)
     exitFullscreen()
+    // Lettura dell'altro barcode annullata: si torna alla scansione di partenza.
+    const base = companionRef.current
+    if (base) {
+      companionRef.current = null
+      setCompanion(null)
+      setScan(base)
+    }
+  }
+
+  function readCompanion(base: Scan) {
+    companionRef.current = base
+    setCompanion(base)
+    enterFullscreen()
+    setScan(null)
+    setSheet(null)
+    setScannerOpen(true)
   }
 
   function closeResult() {
@@ -325,10 +399,11 @@ export default function App() {
           onManual={() => setSheet({ type: 'manual' })}
           onImage={() => fileRef.current?.click()}
           onIssue={onIssue}
+          hint={companion ? t('Inquadra l’altro barcode dello stesso articolo') : undefined}
         />
       )}
 
-      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={openScanner} onRetry={() => verify(scan)} onNotice={setNotice} />}
+      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={openScanner} onRetry={() => verify(scan)} onNotice={setNotice} onCompanion={() => readCompanion(scan)} />}
 
       {drawer && (
         <Drawer

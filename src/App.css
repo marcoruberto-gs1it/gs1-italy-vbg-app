@@ -1711,6 +1711,25 @@
 .chip.ok { background: var(--ok-bg); color: var(--ok); }
 .chip.bad { background: var(--bad-bg); color: var(--bad); }
 
+/* Avvisi sulle associazioni tra AI (dati mancanti o incoerenti) */
+.assoc { display: grid; gap: 10px; padding: 16px 18px; box-shadow: var(--shadow-sm), inset 3px 0 0 var(--warn); }
+.assoc h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--warn); }
+.assoc ul { display: grid; gap: 8px; margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.assoc-hint { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.assoc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; justify-self: start;
+  min-height: 44px; padding: 0 16px; border-radius: 14px; background: var(--warn-bg); color: var(--warn);
+  font-weight: 700; font-size: 14px;
+}
+.assoc-btn:hover { filter: brightness(0.97); }
+.assoc-source { font-size: 11.5px; color: var(--muted); }
+
+.scanner-hint {
+  align-self: center; margin: 0 0 0 12px; padding: 10px 14px; border-radius: 14px; max-width: 280px;
+  background: rgba(0, 20, 50, 0.6); color: #fff; font-size: 14px; font-weight: 600; line-height: 1.35;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
 .result-card {
   border-radius: var(--radius);
   background: var(--surface);
