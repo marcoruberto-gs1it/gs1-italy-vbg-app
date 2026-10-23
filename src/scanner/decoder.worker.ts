@@ -30,7 +30,8 @@ self.onmessage = async ({ data }: MessageEvent<DecoderRequest>) => {
     await ready
     const input = data.type === 'frame' ? new ImageData(new Uint8ClampedArray(data.buffer), data.width, data.height) : data.blob
     const seen = new Set<string>()
-    const hits = (await readBarcodes(input, options))
+    const opts = data.type === 'frame' && data.binarizer ? { ...options, binarizer: data.binarizer } : options
+    const hits = (await readBarcodes(input, opts))
       .filter((result) => result.isValid && result.text && !seen.has(result.text) && seen.add(result.text))
       .map((hit) => ({
         text: hit.text,

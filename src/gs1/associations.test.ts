@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { _setLangForTest } from '../i18n'
-import { combineMany, combineScans, fieldsByBarcode, type Scan } from '../components/scan'
+import { alreadyRead, combineMany, combineScans, fieldsByBarcode, type Scan } from '../components/scan'
 import { assocOutcome } from '../analytics/events'
 import { valueAssociations } from './associations'
 import { interpretScan } from './interpret'
@@ -127,6 +127,13 @@ describe('barcode letti insieme (etichetta logistica)', () => {
     expect(await canCoexist(`(02)${ITEM}(37)24(01)${ITEM}`)).toBe(false) // (01) e (02) non vanno insieme
     expect(await canCoexist('(10)A(10)B')).toBe(false)
     expect(await canCoexist('(10)A(17)251340')).toBe(true) // data errata: lo dice il controllo di sintassi
+  })
+  it('riconosce un barcode già letto e non lo conta due volte', async () => {
+    const sscc = await scan('(00)095060001343520000')
+    expect(alreadyRead(sscc, await scan('(00)095060001343520000'))).toBe(true)
+    expect(alreadyRead(sscc, await scan(`(02)${ITEM}(37)24`))).toBe(false)
+    const joined = combineScans(sscc, await scan('(00)095060001343520000'))
+    expect(joined.ok && joined.barcodes.length).toBe(1)
   })
   it('nessuna unione con un solo barcode', async () => {
     expect(await combineMany([await scan(`(01)${ITEM}`)])).toBeNull()

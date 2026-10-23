@@ -9,7 +9,7 @@ import type { WebRiskResult } from '../gs1/webRisk'
 import { Bars } from './Bars'
 import { groupDigits } from './digits'
 import { FormatIcon } from './Illustrations'
-import { codeType, fieldsByBarcode, formatKind, gs1Compliance, missingNotices, titleOf, type Scan } from './scan'
+import { codeType, fieldsByBarcode, formatKind, gs1Compliance, isLabel, missingNotices, titleOf, type Scan } from './scan'
 import { Symbol2D } from './symbol'
 import { t } from '../i18n'
 import { formatLabel } from '../lib/display'
@@ -286,6 +286,13 @@ export function Result({ scan, origin, onClose, onRescan, onRetry, onNotice, onC
               </section>
             ))}
           </div>
+        )}
+
+        {/* Etichetta logistica: se un barcode non è stato letto, l'utente lo aggiunge (la domanda sui dati mancanti ha già il suo pulsante). */}
+        {isLabel(scan) && !(missing.length > 0 && !scan.assoc) && (
+          <button className="add-barcode" type="button" onClick={onCompanion}>
+            <ScanBarcode size={18} /> {t('Aggiungi un altro barcode dell’etichetta')}
+          </button>
         )}
 
         {(byBarcode ? details.filter(([, , ai]) => !ai) : details).length > 0 && (

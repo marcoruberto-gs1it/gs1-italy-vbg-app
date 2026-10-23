@@ -21,6 +21,9 @@ export type Scan = ScanResult & {
 /** Avvisi su dati mancanti che potrebbero stare in un altro barcode dell'articolo. */
 export const missingNotices = (scan: Scan) => (scan.syntax?.notices ?? []).filter((n) => n.kind === 'missing')
 
+/** Etichetta logistica (GS1-128) o articolo già letto da più barcode: si possono aggiungere altri barcode. */
+export const isLabel = (scan: Scan) => scan.kind === 'gs1' && (scan.format === 'GS1-128' || Boolean(scan.barcodes))
+
 /** In attesa che l'utente dica se c'è un altro barcode (la statistica parte dopo la risposta o alla chiusura). */
 export const awaitsAnswer = (scan: Scan) => missingNotices(scan).length > 0 && !scan.assoc
 
@@ -60,12 +63,20 @@ export function combineScans(base: Scan, extra: Scan): Combination {
   }
   // Parentesi nei valori: si proteggono come previsto dalla sintassi con parentesi.
   const data = [...values].map(([ai, value]) => `(${ai})${value.replace(/\(/g, '\\(')}`).join('')
-  const barcodes = [...barcodesOf(base), ...barcodesOf(extra)]
+  // Lo stesso barcode letto due volte conta una volta sola.
+  const known = new Set(barcodesOf(base).map((b) => b.raw))
+  const barcodes = [...barcodesOf(base), ...barcodesOf(extra).filter((b) => !known.has(b.raw))]
   return { ok: true, data, barcodes }
 }
 
+/** I barcode di extra sono già tutti in base (es. lo scanner ha riletto il barcode di partenza)? */
+export function alreadyRead(base: Scan, extra: Scan) {
+  const known = new Set(barcodesOf(base).map((b) => b.raw))
+  return barcodesOf(extra).every((b) => known.has(b.raw))
+}
+
 /** Barcode di una scansione: quelli già uniti, oppure lei stessa. */
-const barcodesOf = (scan: Scan): Barcode[] => scan.barcodes ?? [{ format: scan.format, raw: scan.raw, ais: aisOf(scan) }]
+export const barcodesOf = (scan: Scan): Barcode[] => scan.barcodes ?? [{ format: scan.format, raw: scan.raw, ais: aisOf(scan) }]
 
 /**
  * Più barcode letti insieme (etichetta logistica): si uniscono nell'ordine di lettura quelli compatibili

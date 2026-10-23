@@ -381,5 +381,8 @@
   "Barcode {i}": "Barcode {i}",
   "{n} barcode di altri articoli non considerati": "{n} barcodes of other items not included",
   "1 dato": "1 data item",
-  "{n} barcode rilevati": "{n} barcodes detected"
+  "Aggiungi un altro barcode dell’etichetta": "Add another barcode from the label",
+  "1 barcode rilevato · tieni fermo il telefono": "1 barcode detected · hold the phone steady",
+  "{n} barcode rilevati · tieni fermo il telefono": "{n} barcodes detected · hold the phone steady",
+  "Barcode già letto: inquadra un altro barcode dell’etichetta": "Barcode already read: point at another barcode on the label"
 }

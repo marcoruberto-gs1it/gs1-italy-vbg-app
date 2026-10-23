@@ -13,7 +13,8 @@ export type Hit = {
 }
 
 export type DecoderRequest =
-  | { type: 'frame'; id: number; width: number; height: number; buffer: ArrayBuffer }
+  /** binarizer: soglia per separare barre e spazi (FixedThreshold aiuta con le immagini un po' sfocate). */
+  | { type: 'frame'; id: number; width: number; height: number; buffer: ArrayBuffer; binarizer?: 'LocalAverage' | 'FixedThreshold' }
   | { type: 'file'; id: number; blob: Blob }
 
 export type DecoderResponse =

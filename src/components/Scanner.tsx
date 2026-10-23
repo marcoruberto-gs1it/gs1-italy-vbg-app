@@ -126,7 +126,11 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
           ))}
         </div>
       )}
-      {marks.length > 1 && !lock && <p className="pill is-count" role="status">{t('{n} barcode rilevati', { n: marks.length })}</p>}
+      {marks.length > 0 && !lock && (
+        <p className="pill is-count" role="status">
+          {marks.length === 1 ? t('1 barcode rilevato · tieni fermo il telefono') : t('{n} barcode rilevati · tieni fermo il telefono', { n: marks.length })}
+        </p>
+      )}
       {lock && <div className="flash" aria-hidden="true" />}
 
       <header className="scanner-top">

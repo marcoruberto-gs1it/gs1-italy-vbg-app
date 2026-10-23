@@ -29,7 +29,15 @@ const NEEDS_CONFIRM = /Codabar|Code39|Code93|ITF/
  * QR Code e gli altri si consegna subito il primo barcode, come sempre (sullo scaffale ci sono i
  * barcode dei prodotti vicini).
  */
-const LABEL_WINDOW = 600
+// Raccolta adattiva: almeno LABEL_MIN, si chiude LABEL_QUIET dopo l'ultimo barcode nuovo, mai oltre LABEL_MAX.
+const LABEL_MIN = 900
+const LABEL_QUIET = 700
+const LABEL_MAX = 3000
+// Durante la raccolta i fotogrammi si analizzano alla risoluzione piena della fotocamera: i GS1-128 di
+// un'etichetta sono spesso densi e a 1280 px le barre più sottili si perdono.
+const LABEL_MAX_SIDE = 2560
+// …e si alternano due modi di separare barre e spazi: su un'immagine un po' sfocata uno legge quello che l'altro perde.
+const LABEL_BINARIZERS = ['LocalAverage', 'FixedThreshold'] as const
 const isGs1128 = (hit: Hit) => hit.symbologyIdentifier === ']C1'
 
 function classify(error: unknown): CameraError {
@@ -186,7 +194,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
     let last = 0
     let stopped = false
     // Barcode raccolti da un'etichetta con GS1-128: testo → lettura, posizione, quante volte visto.
-    let label: { until: number; seen: Map<string, { hit: Hit; quad: Quad; count: number }> } | null = null
+    let label: { start: number; lastNew: number; seen: Map<string, { hit: Hit; quad: Quad; count: number }> } | null = null
+    const labelDone = (now: number) => Boolean(label && (now - label.start >= LABEL_MAX || (now - label.start >= LABEL_MIN && now - label.lastNew >= LABEL_QUIET)))
     const canvas = document.createElement('canvas')
 
     const deliver = (items: { hit: Hit; quad: Quad }[]) => {
@@ -213,7 +222,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
         label = null
         onCollectRef.current?.([], [])
       }
-      if (label && now >= label.until && !busy) return closeLabel()
+      if (label && labelDone(now) && !busy) return closeLabel()
       if (busy || !ctx || !video || !activeRef.current || now - last < MIN_INTERVAL || video.readyState < 2) return
       const vw = video.videoWidth
       const vh = video.videoHeight
@@ -226,7 +235,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
       const scale = Math.max(ew / vw, eh / vh)
       const visW = ew / scale
       const visH = eh / scale
-      const factor = Math.min(1, MAX_SIDE / Math.max(visW, visH))
+      const factor = Math.min(1, (label ? LABEL_MAX_SIDE : MAX_SIDE) / Math.max(visW, visH))
       canvas.width = Math.round(visW * factor)
       canvas.height = Math.round(visH * factor)
       ctx.drawImage(video, (vw - visW) / 2, (vh - visH) / 2, visW, visH, 0, 0, canvas.width, canvas.height)
@@ -235,7 +244,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
 
       busy = true
       const id = nextIdRef.current++
-      void decode({ type: 'frame', id, width: frame.width, height: frame.height, buffer: frame.data.buffer }, [frame.data.buffer]).then((hits) => {
+      const binarizer = label ? LABEL_BINARIZERS[id % LABEL_BINARIZERS.length] : undefined
+      void decode({ type: 'frame', id, width: frame.width, height: frame.height, buffer: frame.data.buffer, binarizer }, [frame.data.buffer]).then((hits) => {
         busy = false
         if (stopped || !activeRef.current) return
         const toScreen = ({ x, y }: { x: number; y: number }) => {
@@ -250,17 +260,18 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
         })
 
         // Etichetta con GS1-128: si raccolgono i barcode visibili fino alla fine della finestra.
-        if (!label && hits.some(isGs1128)) label = { until: now + LABEL_WINDOW, seen: new Map() }
+        if (!label && hits.some(isGs1128)) label = { start: now, lastNew: now, seen: new Map() }
         if (label) {
           for (const hit of hits) {
             const known = label.seen.get(hit.text)
+            if (!known) label.lastNew = performance.now()
             label.seen.set(hit.text, { hit, quad: quadOf(hit), count: (known?.count ?? 0) + 1 })
           }
           // Evidenziazione dal vivo: i barcode visti finora, nell'ordine di lettura dell'etichetta.
           const seen = [...label.seen.values()]
           const ordered = byPosition(seen.map((i) => i.hit))
           onCollectRef.current?.(ordered, ordered.map((hit) => seen.find((i) => i.hit === hit)!.quad))
-          if (performance.now() >= label.until) closeLabel()
+          if (labelDone(performance.now())) closeLabel()
           return
         }
 

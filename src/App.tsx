@@ -12,7 +12,7 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { awaitsAnswer, combineMany, combineScans, needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { alreadyRead, awaitsAnswer, combineMany, combineScans, isLabel, needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { canCoexist, checkSyntax, loadSyntaxEngine } from './gs1/syntax'
@@ -107,7 +107,9 @@ export default function App() {
     if (source && item) sendEvent(item, source)
   }, [])
 
-  const ready = (item: Scan) => isSettled(item) && (!awaitsAnswer(item) || closedEvents.current.has(item.id))
+  // Etichette logistiche: si aspetta la chiusura del risultato, perché l'utente può aggiungere altri barcode.
+  const open = (item: Scan) => (awaitsAnswer(item) || isLabel(item)) && !closedEvents.current.has(item.id)
+  const ready = (item: Scan) => isSettled(item) && !open(item)
 
   useEffect(() => {
     historyRef.current = history
@@ -275,7 +277,7 @@ export default function App() {
         // (salvo che si aspetti la risposta dell'utente sull'altro barcode).
         window.setTimeout(() => {
           const item = historyRef.current.find((h) => h.id === result.id)
-          if (pendingEvents.current.has(result.id) && item && (!awaitsAnswer(item) || closedEvents.current.has(item.id))) dispatch(result.id)
+          if (pendingEvents.current.has(result.id) && item && !open(item)) dispatch(result.id)
         }, 12_000)
       }
       setOrigin(center ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.4 })
@@ -293,6 +295,11 @@ export default function App() {
     (scanned: Scan, center?: { x: number; y: number }, source?: ScanSource) => {
       const base = companionRef.current
       if (!base) return present(scanned, center, source)
+      // Lo scanner ha riletto un barcode già letto (l'etichetta è ancora inquadrata): si continua a cercare.
+      if (alreadyRead(base, scanned)) {
+        setNotice(t('Barcode già letto: inquadra un altro barcode dell’etichetta'))
+        return
+      }
       companionRef.current = null
       setCompanion(null)
       void attach(base, scanned).then((handled) => {
