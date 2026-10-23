@@ -27,6 +27,8 @@ type Props = {
   onIssue: (issue: CameraError | null) => void
   /** Indicazione in alto (es. quando si legge l'altro barcode di un articolo). */
   hint?: string
+  /** Barcode appena letti: ignorati finché restano inquadrati. */
+  skip?: string[]
 }
 
 /** Rettangolo che contiene tutti i quadrilateri. */
@@ -59,7 +61,7 @@ function quadStyle(q: Quad, linear: boolean): CSSProperties {
   return { left, top, width, height, margin: 0 }
 }
 
-export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, hint }: Props) {
+export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, hint, skip }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [lock, setLock] = useState<{ quad: Quad; linear: boolean } | null>(null)
   // Barcode rilevati in un'etichetta (più di uno): ognuno evidenziato e numerato come nel risultato.
@@ -81,7 +83,7 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
     [onRead],
   )
 
-  const camera = useScanner(videoRef, { enabled: true, active: !paused && !lock, onDetect, onCollect })
+  const camera = useScanner(videoRef, { enabled: true, active: !paused && !lock, onDetect, onCollect, skip })
 
   // Quando si torna allo scanner dopo un esito, il mirino si riapre.
   const [wasPaused, setWasPaused] = useState(paused)

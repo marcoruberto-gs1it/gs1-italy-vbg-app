@@ -12,7 +12,7 @@ import { IllPhone } from './components/Illustrations'
 import { InfoContent, infoTitles } from './components/InfoSheets'
 import { Result } from './components/Result'
 import { Scanner } from './components/Scanner'
-import { alreadyRead, awaitsAnswer, combineMany, combineScans, isLabel, needsVerification, withDisplayFormat, type Scan } from './components/scan'
+import { alreadyRead, awaitsAnswer, barcodesOf, combineMany, combineScans, isLabel, needsVerification, withDisplayFormat, type Scan } from './components/scan'
 import { packSymbol } from './components/symbolData'
 import { interpretScan, loadToolkit } from './gs1/interpret'
 import { canCoexist, checkSyntax, loadSyntaxEngine } from './gs1/syntax'
@@ -72,6 +72,8 @@ export default function App() {
   const [raised, setRaised] = useState(false)
   // Scansione a cui si sta aggiungendo un altro barcode dello stesso articolo (dati su più barcode).
   const [companion, setCompanion] = useState<Scan | null>(null)
+  // Barcode da non rileggere alla riapertura dello scanner (vedi openScanner).
+  const [skip, setSkip] = useState<string[]>([])
   const companionRef = useRef<Scan | null>(null)
   // Statistiche: scansioni nuove in attesa che tutti i controlli asincroni siano arrivati.
   const pendingEvents = useRef(new Map<string, ScanSource>())
@@ -93,6 +95,12 @@ export default function App() {
       /* archiviazione non disponibile */
     }
   }, [history])
+
+  // Scheda di un codice letto: lo scanner si chiude (la fotocamera si spegne) e si riapre solo su richiesta.
+  const leaveScanner = useCallback(() => {
+    setScannerOpen(false)
+    exitFullscreen()
+  }, [])
 
   /*
    * Statistiche: un solo evento per articolo, quando è "chiuso". Cioè quando sono arrivati i controlli
@@ -233,6 +241,7 @@ export default function App() {
       if (!joined.ok) {
         if (joined.reason === 'not-gs1') {
           setNotice(t('Il barcode letto non contiene dati GS1'))
+          leaveScanner()
           setScan(base)
           return true
         }
@@ -257,13 +266,14 @@ export default function App() {
         syntax: undefined,
         vbg: samePrimary ? base.vbg : undefined,
       })
+      leaveScanner()
       setScan(merged)
       setHistory((list) => list.map((item) => (item.id === merged.id ? merged : item)))
       verify(merged)
       lint(merged)
       return true
     },
-    [verify, lint, closeEvent],
+    [verify, lint, closeEvent, leaveScanner],
   )
 
   const present = useCallback(
@@ -281,13 +291,14 @@ export default function App() {
         }, 12_000)
       }
       setOrigin(center ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.4 })
+      leaveScanner()
       setScan(result)
       setHistory((list) => [result, ...list.filter((item) => item.raw !== result.raw)].slice(0, 30))
       verify(result)
       lint(result)
       guard(result)
     },
-    [verify, lint, guard, dispatch],
+    [verify, lint, guard, dispatch, leaveScanner],
   )
 
   // Ogni lettura passa da qui: se si sta leggendo l'altro barcode di un articolo, i dati si uniscono.
@@ -368,8 +379,13 @@ export default function App() {
     if (issue === null || PERSISTENT_ISSUES.includes(issue)) setCameraIssue(issue)
   }, [])
 
-  function openScanner() {
+  /**
+   * skip: barcode appena letti (dalla scheda, "Scansiona di nuovo" o "Aggiungi un altro barcode"):
+   * lo scanner li ignora finché restano inquadrati, così non rilegge subito lo stesso codice.
+   */
+  function openScanner(skip: string[] = []) {
     enterFullscreen()
+    setSkip(skip)
     setScan(null)
     setSheet(null)
     setScannerOpen(true)
@@ -397,6 +413,7 @@ export default function App() {
   function readCompanion(base: Scan) {
     companionRef.current = base
     setCompanion(base)
+    setSkip(barcodesOf(base).map((b) => b.raw))
     enterFullscreen()
     setScan(null)
     setSheet(null)
@@ -449,7 +466,7 @@ export default function App() {
         {tab === 'home' ? (
           <Home
             cameraIssue={cameraIssue}
-            onScan={openScanner}
+            onScan={() => openScanner()}
             onManual={() => setSheet({ type: 'manual' })}
             onInfo={(topic) => setSheet({ type: 'info', topic })}
             onPrivacy={() => setSheet({ type: 'privacy' })}
@@ -470,13 +487,13 @@ export default function App() {
               <div className="empty-card">
                 <IllPhone />
                 <p>{t('Qui trovi i codici che leggi. Restano solo su questo dispositivo.')}</p>
-                <button className="cta" type="button" onClick={openScanner}><ScanBarcode size={20} /> {t('Scansiona un codice')}</button>
+                <button className="cta" type="button" onClick={() => openScanner()}><ScanBarcode size={20} /> {t('Scansiona un codice')}</button>
               </div>
             )}
           </div>
         )}
 
-        <TabBar tab={tab} onTab={setTab} onScan={openScanner} badge={history.length} />
+        <TabBar tab={tab} onTab={setTab} onScan={() => openScanner()} badge={history.length} />
       </div>
 
       {scannerOpen && (
@@ -488,16 +505,17 @@ export default function App() {
           onImage={() => fileRef.current?.click()}
           onIssue={onIssue}
           hint={companion ? t('Inquadra l’altro barcode dello stesso articolo') : undefined}
+          skip={skip}
         />
       )}
 
-      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={openScanner} onRetry={() => verify(scan)} onNotice={setNotice} onCompanion={() => readCompanion(scan)} onDecline={() => decline(scan)} />}
+      {scan && <Result key={scan.id} scan={scan} origin={origin} onClose={closeResult} onRescan={() => openScanner(barcodesOf(scan).map((b) => b.raw))} onRetry={() => verify(scan)} onNotice={setNotice} onCompanion={() => readCompanion(scan)} onDecline={() => decline(scan)} />}
 
       {drawer && (
         <Drawer
           onClose={() => setDrawer(false)}
           onPrivacy={() => setSheet({ type: 'privacy' })}
-          onScan={openScanner}
+          onScan={() => openScanner()}
           onManual={() => setSheet({ type: 'manual' })}
           onImage={() => fileRef.current?.click()}
           onTab={setTab}

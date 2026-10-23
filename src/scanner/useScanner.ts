@@ -15,6 +15,8 @@ type Options = {
   onDetect: (hits: Hit[], quads: Quad[]) => void
   /** Barcode rilevati finora mentre si raccoglie un'etichetta (vuoto quando la raccolta si annulla). */
   onCollect?: (hits: Hit[], quads: Quad[]) => void
+  /** Barcode appena letti da ignorare finché restano inquadrati (tornano leggibili dopo SKIP_GONE senza vederli). */
+  skip?: string[]
 }
 
 type FrameMap = { scale: number; factor: number; width: number; mirrored: boolean }
@@ -39,6 +41,8 @@ const LABEL_MAX_SIDE = 2560
 // …e si alternano due modi di separare barre e spazi: su un'immagine un po' sfocata uno legge quello che l'altro perde.
 const LABEL_BINARIZERS = ['LocalAverage', 'FixedThreshold'] as const
 const isGs1128 = (hit: Hit) => hit.symbologyIdentifier === ']C1'
+// Un barcode da ignorare torna leggibile quando non lo si vede per questo tempo (è uscito dall'inquadratura).
+const SKIP_GONE = 1000
 
 function classify(error: unknown): CameraError {
   const name = error instanceof DOMException ? error.name : (error as { name?: string })?.name
@@ -50,7 +54,7 @@ function classify(error: unknown): CameraError {
 
 const watchedTracks = new WeakSet<MediaStreamTrack>()
 
-export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabled, active, onDetect, onCollect }: Options) {
+export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabled, active, onDetect, onCollect, skip }: Options) {
   const [status, setStatus] = useState<CameraStatus>('starting')
   const [error, setError] = useState<CameraError | null>(null)
   const [torch, setTorch] = useState({ available: false, on: false })
@@ -65,6 +69,13 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
   const pendingRef = useRef(new Map<number, (hits: Hit[]) => void>())
   const nextIdRef = useRef(1)
   const lastTextRef = useRef<{ text: string; at: number } | null>(null)
+  // Barcode da ignorare → ultima volta che sono stati visti.
+  const skipRef = useRef(new Map<string, number>())
+
+  useEffect(() => {
+    const now = performance.now()
+    skipRef.current = new Map((skip ?? []).map((text) => [text, now]))
+  }, [skip])
 
   useEffect(() => {
     onDetectRef.current = onDetect
@@ -258,6 +269,17 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
           bottomRight: toScreen(p.bottomRight),
           bottomLeft: toScreen(p.bottomLeft),
         })
+
+        // Barcode appena letti ancora inquadrati: si ignorano (e si ricorda che ci sono ancora).
+        const t = performance.now()
+        for (const [text, seen] of skipRef.current) if (t - seen > SKIP_GONE) skipRef.current.delete(text)
+        if (skipRef.current.size) {
+          hits = hits.filter((hit) => {
+            if (!skipRef.current.has(hit.text)) return true
+            skipRef.current.set(hit.text, t)
+            return false
+          })
+        }
 
         // Etichetta con GS1-128: si raccolgono i barcode visibili fino alla fine della finestra.
         if (!label && hits.some(isGs1128)) label = { start: now, lastNew: now, seen: new Map() }
