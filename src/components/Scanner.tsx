@@ -38,6 +38,15 @@ function enclosing(quads: Quad[]): Quad {
   return { topLeft: { x: left, y: top }, topRight: { x: right, y: top }, bottomRight: { x: right, y: bottom }, bottomLeft: { x: left, y: bottom } }
 }
 
+/** Riquadro di un barcode rilevato: per i barcode lineari zxing dà la linea di lettura, si allarga un poco. */
+function markStyle(q: Quad): CSSProperties {
+  const xs = [q.topLeft.x, q.topRight.x, q.bottomRight.x, q.bottomLeft.x]
+  const ys = [q.topLeft.y, q.topRight.y, q.bottomRight.y, q.bottomLeft.y]
+  const width = Math.max(...xs) - Math.min(...xs) + 16
+  const height = Math.max(Math.max(...ys) - Math.min(...ys) + 16, 40)
+  return { left: (Math.min(...xs) + Math.max(...xs)) / 2 - width / 2, top: (Math.min(...ys) + Math.max(...ys)) / 2 - height / 2, width, height }
+}
+
 function quadStyle(q: Quad, linear: boolean): CSSProperties {
   const xs = [q.topLeft.x, q.topRight.x, q.bottomRight.x, q.bottomLeft.x]
   const ys = [q.topLeft.y, q.topRight.y, q.bottomRight.y, q.bottomLeft.y]
@@ -53,11 +62,15 @@ function quadStyle(q: Quad, linear: boolean): CSSProperties {
 export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, hint }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [lock, setLock] = useState<{ quad: Quad; linear: boolean } | null>(null)
+  // Barcode rilevati in un'etichetta (più di uno): ognuno evidenziato e numerato come nel risultato.
+  const [marks, setMarks] = useState<Quad[]>([])
+  const onCollect = useCallback((_hits: Hit[], quads: Quad[]) => setMarks(quads), [])
 
   const onDetect = useCallback(
     (hits: Hit[], quads: Quad[]) => {
       // Il mirino si aggancia all'area che contiene tutti i barcode letti.
       const quad = quads.length === 1 ? quads[0] : enclosing(quads)
+      setMarks(quads.length > 1 ? quads : [])
       setLock({ quad, linear: hits.length > 1 || !/QR|Matrix|Aztec|PDF417|MaxiCode/i.test(hits[0].format) })
       navigator.vibrate?.(hits.length > 1 ? [35, 60, 35] : 35)
       const rect = videoRef.current?.getBoundingClientRect()
@@ -68,13 +81,16 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
     [onRead],
   )
 
-  const camera = useScanner(videoRef, { enabled: true, active: !paused && !lock, onDetect })
+  const camera = useScanner(videoRef, { enabled: true, active: !paused && !lock, onDetect, onCollect })
 
   // Quando si torna allo scanner dopo un esito, il mirino si riapre.
   const [wasPaused, setWasPaused] = useState(paused)
   if (paused !== wasPaused) {
     setWasPaused(paused)
-    if (!paused) setLock(null)
+    if (!paused) {
+      setLock(null)
+      setMarks([])
+    }
   }
 
   useEffect(() => {
@@ -88,7 +104,12 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
       <video ref={videoRef} className="scanner-video" autoPlay muted playsInline />
 
       {camera.status !== 'error' && (
-        <div className={`finder ${lock ? 'is-locked' : ''} ${camera.status === 'live' ? 'is-live' : ''}`} style={lock ? quadStyle(lock.quad, lock.linear) : undefined} aria-hidden="true">
+        // Mentre si raccoglie un'etichetta il mirino si allarga a tutti i barcode rilevati, così nessuno resta in ombra.
+        <div
+          className={`finder ${lock ? 'is-locked' : ''} ${marks.length > 1 ? 'is-collecting' : ''} ${camera.status === 'live' ? 'is-live' : ''}`}
+          style={lock ? quadStyle(lock.quad, lock.linear) : marks.length > 1 ? quadStyle(enclosing(marks), false) : undefined}
+          aria-hidden="true"
+        >
           <i className="c tl" />
           <i className="c tr" />
           <i className="c br" />
@@ -96,6 +117,16 @@ export function Scanner({ paused, onRead, onClose, onManual, onImage, onIssue, h
           <span className="beam" />
         </div>
       )}
+      {marks.length > 0 && (
+        <div className="marks" aria-hidden="true">
+          {marks.map((q, i) => (
+            <span key={i} className="mark" style={markStyle(q)}>
+              <b>{i + 1}</b>
+            </span>
+          ))}
+        </div>
+      )}
+      {marks.length > 1 && !lock && <p className="pill is-count" role="status">{t('{n} barcode rilevati', { n: marks.length })}</p>}
       {lock && <div className="flash" aria-hidden="true" />}
 
       <header className="scanner-top">

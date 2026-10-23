@@ -380,5 +380,6 @@
   "Barcode {i} · {format}": "Barcode {i} · {format}",
   "Barcode {i}": "Barcode {i}",
   "{n} barcode di altri articoli non considerati": "{n} barcodes of other items not included",
-  "1 dato": "1 data item"
+  "1 dato": "1 data item",
+  "{n} barcode rilevati": "{n} barcodes detected"
 }

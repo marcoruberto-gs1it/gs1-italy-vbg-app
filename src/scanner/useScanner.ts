@@ -13,6 +13,8 @@ type Options = {
   active: boolean
   /** Barcode letti (più di uno solo da un'etichetta con GS1-128), con la posizione sullo schermo. */
   onDetect: (hits: Hit[], quads: Quad[]) => void
+  /** Barcode rilevati finora mentre si raccoglie un'etichetta (vuoto quando la raccolta si annulla). */
+  onCollect?: (hits: Hit[], quads: Quad[]) => void
 }
 
 type FrameMap = { scale: number; factor: number; width: number; mirrored: boolean }
@@ -40,7 +42,7 @@ function classify(error: unknown): CameraError {
 
 const watchedTracks = new WeakSet<MediaStreamTrack>()
 
-export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabled, active, onDetect }: Options) {
+export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabled, active, onDetect, onCollect }: Options) {
   const [status, setStatus] = useState<CameraStatus>('starting')
   const [error, setError] = useState<CameraError | null>(null)
   const [torch, setTorch] = useState({ available: false, on: false })
@@ -51,13 +53,15 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
   const sessionRef = useRef(0)
   const activeRef = useRef(active)
   const onDetectRef = useRef(onDetect)
+  const onCollectRef = useRef(onCollect)
   const pendingRef = useRef(new Map<number, (hits: Hit[]) => void>())
   const nextIdRef = useRef(1)
   const lastTextRef = useRef<{ text: string; at: number } | null>(null)
 
   useEffect(() => {
     onDetectRef.current = onDetect
-  }, [onDetect])
+    onCollectRef.current = onCollect
+  }, [onDetect, onCollect])
 
   useEffect(() => {
     const worker = new Worker(new URL('./decoder.worker.ts', import.meta.url), { type: 'module' })
@@ -205,7 +209,10 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
       raf = requestAnimationFrame(tick)
       const video = videoRef.current
       // Scanner in pausa (esito o pannello aperto): la raccolta in corso si annulla.
-      if (!activeRef.current) label = null
+      if (!activeRef.current && label) {
+        label = null
+        onCollectRef.current?.([], [])
+      }
       if (label && now >= label.until && !busy) return closeLabel()
       if (busy || !ctx || !video || !activeRef.current || now - last < MIN_INTERVAL || video.readyState < 2) return
       const vw = video.videoWidth
@@ -249,6 +256,10 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>, { enabl
             const known = label.seen.get(hit.text)
             label.seen.set(hit.text, { hit, quad: quadOf(hit), count: (known?.count ?? 0) + 1 })
           }
+          // Evidenziazione dal vivo: i barcode visti finora, nell'ordine di lettura dell'etichetta.
+          const seen = [...label.seen.values()]
+          const ordered = byPosition(seen.map((i) => i.hit))
+          onCollectRef.current?.(ordered, ordered.map((hit) => seen.find((i) => i.hit === hit)!.quad))
           if (performance.now() >= label.until) closeLabel()
           return
         }
